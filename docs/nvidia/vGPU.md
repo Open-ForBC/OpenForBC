@@ -1,22 +1,14 @@
 # NVIDIA vGPU
 
-NVIDIA vGPU is a propietary technology which allows multiple VMs to access a
-single physical GPU. This allows dedicated graphics pass-through to multiple VMs
-using a single card.
+NVIDIA vGPU is a proprietary technology which allows multiple VMs to access a single physical GPU. This allows dedicated graphics pass-through to multiple VMs using a single card.
 
 ## Features
 
 ### GPU Instance support
 
-vGPU supports GPU instances on GPUs that support NVIDIA Multi-Instance GPU (MIG)
-feature. In addition to all the MIG features, vGPU adds Single Root I/O
-Virtualization (SR-IOV) support for the virtual functions, which enables IOMMU
-protection for the VMs.
+vGPU supports GPU instances on GPUs that support NVIDIA Multi-Instance GPU (MIG) feature. In addition to all the MIG features, vGPU adds Single Root I/O Virtualization [(SR-IOV)](https://en.wikipedia.org/wiki/Single-root_input/output_virtualization) support for the virtual functions, which enables IOMMU protection for the VMs.
 
-To support GPU instances with vGPU the guest operating system must be Linux, the
-GPU needs to have MIG mode already enabled and the GPU instances must be created
-and configured (see [MIG-Backed vGPU configuration
-documentation](#configuring-mig-backed-vgpus)).
+To support GPU instances with vGPU the guest operating system must be Linux, the GPU needs to have MIG mode already enabled and the GPU instances must be created and configured (see [MIG-Backed vGPU configuration documentation](#configuring-mig-backed-vgpus)).
 
 ### API support on vGPU
 
@@ -32,16 +24,11 @@ Guests can use the following APIs in VMs using vGPUs:
 - NVIDIA vGPU software SDK (remote graphics acceleration)
 - NVIDIA RTX (on Volta and later architectures)
 
-OpenCL and NVIDIA CUDA support is limited to C-series vGPU types (see [vGPU
-types documentation](#vgpu-types)) and Q-series vGPU types (only in limited
-GPUs), please refer to [NVIDIA official documentation on this
-subject](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index.html#cuda-open-cl-support-vgpu).
+OpenCL and NVIDIA CUDA support is limited to C-series vGPU types (see [vGPU types documentation](#vgpu-types)) and Q-series vGPU types (only in limited GPUs), please refer to [NVIDIA official documentation on this subject](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index.html#cuda-open-cl-support-vgpu).
 
 ### Additional vWS features
 
-Citing [official NVIDIA
-documentation](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index.html#features-vgpu-quadro-vdws-extras)
-vWS offers some additional features:
+Citing [official NVIDIA documentation](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index.html#features-vgpu-quadro-vdws-extras) vWS offers some additional features:
 
 - Workstation-specific graphics features and accelerations
 - Certified drivers for professional applications
@@ -50,44 +37,32 @@ vWS offers some additional features:
 
 ### Containers support
 
-vGPUs support NVIDIA GPU Cloud (NGC) containers on all hypervisors, using either
-Q-series or C-series vGPU types.
+vGPUs support NVIDIA GPU Cloud (NGC) containers on all hypervisors, using either Q-series or C-series vGPU types.
 
 ### NVIDIA GPU Operator
 
-NVIDIA GPU Operator automatically manages installation and upgrade of NVIDIA
-drivers in guest VMs configured with vGPU that are used to run containers.
+NVIDIA GPU Operator automatically manages installation and upgrade of NVIDIA drivers in guest VMs configured with vGPU that are used to run containers.
 
 ## Virtual GPUs
 
 ### vGPU Architecture
 
-A vGPU is similar to a physical GPU and has a fixed amount of framebuffer
-configured upon creation and one or more display "heads".
+A vGPU is similar to a physical GPU and has a fixed amount of framebuffer configured upon creation and one or more display "heads".
 
-Two kinds of vGPUs can be created, depending on the physical GPU architecture:
-time-sliced vGPUs are supported on all GPUs that support vGPU, while GPUs with
-Ampere or later architectures can also support Multi-Instance GPU
-([MIG](./mig.md)) backed vGPUs.
+Two kinds of vGPUs can be created, depending on the physical GPU architecture: time-sliced vGPUs are supported on all GPUs that support vGPU, while GPUs with
+Ampere or later architectures can also support Multi-Instance GPU ([MIG](./mig.md)) backed vGPUs.
 
 #### Time-sliced vGPUs
 
-Time-sliced vGPUs running on a GPU share access to all the GPU's engines,
-processes from vGPUs are scheduled by the GPU to run in series and the running
-vGPU has exclusive access to GPU's engines. The [scheduling
-behavior](#time-sliced-vgpu-scheduling-bahevior) of time-sliced vGPUs can be
-changed on GPUs based on architectures after Maxwell.
+Time-sliced vGPUs running on a GPU share access to all the GPU's engines, processes from vGPUs are scheduled by the GPU to run in series and the running vGPU has exclusive access to GPU's engines. The [scheduling behavior](#time-sliced-vgpu-scheduling-bahevior) of time-sliced vGPUs can be changed on GPUs based on architectures after Maxwell.
 
 #### MIG-backed vGPUs
 
-MIG-backed vGPUs all have exclusive access to its [GPU
-instance](./mig.md#mig-gpu-instance)'s engines. All the vGPUs running in a MIG
-compatible GPU run simultaneously.
+MIG-backed vGPUs all have exclusive access to its [GPU instance](./mig.md#mig-gpu-instance)'s engines. All the vGPUs running in a MIG compatible GPU run simultaneously.
 
 ### vGPU types
 
-Each GPU supports different types of vGPUs, which are grouped into series which
-are optimized for different workloads:
+Each GPU supports different types of vGPUs, which are grouped into series which are optimized for different workloads:
 
 | Series   | Workload                                 |
 |----------|------------------------------------------|
@@ -96,42 +71,32 @@ are optimized for different workloads:
 | B-series | Virtual desktops (business)              |
 | A-series | App streaming                            |
 
-Example naming: A16-4C is a C-series vGPU type with 4GiB framebuffer running on
-an NVIDIA A16.
+Example naming: A16-4C is a C-series vGPU type with 4GiB framebuffer running on an NVIDIA A16.
 
-The frame-rate limiter (FRL), enabled by default, limits B-series vGPUs to 45FPS
-and Q-series, C-series and A-series vGPUs to 60FPS. It is disabled when the
-scheduling behavior is changed from best-effort and can be manually disabled
-(see [release notes](https://docs.nvidia.com/grid/latest) for your hypervisor).
+The frame-rate limiter (FRL), enabled by default, limits B-series vGPUs to 45FPS and Q-series, C-series and A-series vGPUs to 60FPS. It is disabled when the
+scheduling behavior is changed from best-effort and can be manually disabled (see [release notes](https://docs.nvidia.com/grid/latest) for your hypervisor).
 
-The type of license required to enable vGPU features within the guest VM depends
-on the vGPU type:
+The type of license required to enable vGPU features within the guest VM depends on the vGPU type:
 
 - Q-series require a vWS license
 - C-series require vCS or vWS license
 - B-series require vPC or vWS license
 - A-series require vApps license
 
-See [nvidia
-page](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index.html#supported-gpus-grid-vgpu)
-for vGPU types supported on different GPUs.
+See [nvidia page](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index.html#supported-gpus-grid-vgpu) for vGPU types supported on different GPUs.
 
 ### Valid vGPU configurations
 
-On a single GPU all time-sliced vGPUs must be of the same type, while MIG-backed
-vGPUs can halso have a mixed configuration.
+On a single GPU all time-sliced vGPUs must be of the same type, while MIG-backed vGPUs can halso have a mixed configuration.
 
 ### Guest VM support
 
-Windows guests are not supported on C-series vGPU types and linux guests are not
-supported on A-series vGPU types.
+Windows guests are not supported on C-series vGPU types and linux guests are not supported on A-series vGPU types.
 
 ## vGPU Manager installation
 
-This section describes how install the vGPU software package in a generic linux
-KVM hypervisor. Only some hypervisors are officially supported by NVIDIA and
-will install the package without any issues, please use a stable kernel version
-(preferably a RHEL-like distro) to ensure a smooth installation as newer kernels
+This section describes how install the vGPU software package in a generic linux KVM hypervisor. Only some hypervisors are officially supported by NVIDIA and
+will install the package without any issues, please use a stable kernel version (preferably a RHEL-like distro) to ensure a smooth installation as newer kernels
 may require some patches.
 
 ### vGPU requirements
@@ -147,34 +112,25 @@ vGPU requires:
 
 ### vGPU package installation
 
-The vGPU package is a compressed directory which contains a package file, which
-is usually named `NVIDIA-Linux-<arch>-<version>-vgpu-kvm.run`. To install the
-package, simply run it as root, optionally passing the `--dkms` option if you
-want the kernel module to be rebuilt automatically when upgrading the kernel
-(requires the DKMS package to be installed).
+The vGPU package is a compressed directory which contains a package file, which is usually named `NVIDIA-Linux-<arch>-<version>-vgpu-kvm.run`. To install the package, simply run it as root, optionally passing the `--dkms` option if you want the kernel module to be rebuilt automatically when upgrading the kernel (requires the DKMS package to be installed).
 
-If the build succeeds the package will be installed and after a reboot the
-module will be automatically loaded.
+If the build succeeds the package will be installed and after a reboot the module will be automatically loaded.
 
 ## Managing vGPUs
 
-Before creating any vGPU you'll need the full PCI identifier of your
-vGPU-capable GPU, which you can get by using the *lspci* tool:
+Before creating any vGPU you'll need the full PCI identifier of your vGPU-capable GPU, which you can get by using the *lspci* tool:
 
 ```shell
 lspci -Dnn | grep -i nvidia
 ```
 
-The PCI identifier is composed of four fields: *slot*, *bus*, *domain* and
-*function*; which are represented as follows: `slot:bus:domain.function`.
+The PCI identifier is composed of four fields: *slot*, *bus*, *domain* and *function*; which are represented as follows: `slot:bus:domain.function`.
 
 ### Enabling SRIOV
 
-NVIDIA GPUs with architectures such as Ampere or newer support SRIOV and
-**needs** it to be enabled before creating any vGPU.
+NVIDIA GPUs with architectures such as Ampere or newer support SRIOV and **needs** it to be enabled before creating any vGPU.
 
-> NOTE: Before enabling SRVIOV on the GPU make sure it's enabled in the BIOS
-> settings
+> NOTE: Before enabling SRVIOV on the GPU make sure it's enabled in the BIOS settings
 
 NVIDIA vGPU software comes with a *sriov-manage* script which can be used to
 enable SRIOV:
