@@ -144,7 +144,7 @@ After running the script without errors, virtual functions will be enabled for t
 ls -l /sys/bus/pci/devices/<slot:bus:domain.function>/ | grep virtfn
 ```
 
-### Creating a legacy vGPU ()
+### Creating a legacy vGPU
 
 *Note: These instructions are for GPUs that do not support sriov. They are based on [nVidia official documentation](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index.html#creating-legacy-vgpu-device-red-hat-el-kvm), but not yet tested*
 
