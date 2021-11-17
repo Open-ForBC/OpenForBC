@@ -239,7 +239,7 @@ Then find out the type's subdirectory name (`nvidia-*`):
 grep -l <vgpu_type_name> /sys/bus/pci/devices/<slot:bus:domain.function>/<virtfn_no>/mdev_supported_types/*/name
 ```
 
-Make sure that the vGPU type has avaibale instances:
+Make sure that the vGPU type has available instances:
 
 ```shell
 cat /sys/bus/pci/devices/<slot:bus:domain.function>/<virtfn_no>/mdev_supported_types/nvidia-<vgpu_type_id>/available_instances
