@@ -87,7 +87,7 @@ See [nvidia page](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index
 
 ### Valid vGPU configurations
 
-On a single GPU all time-sliced vGPUs must be of the same type, while MIG-backed vGPUs can halso have a mixed configuration.
+On a single GPU all time-sliced vGPUs must be of the same type, while MIG-backed vGPUs can also have a mixed configuration.
 
 ### Guest VM support
 
@@ -132,15 +132,13 @@ NVIDIA GPUs with architectures such as Ampere or newer support SRIOV and **needs
 
 > NOTE: Before enabling SRVIOV on the GPU make sure it's enabled in the BIOS settings
 
-NVIDIA vGPU software comes with a *sriov-manage* script which can be used to
-enable SRIOV:
+NVIDIA vGPU software comes with a *sriov-manage* script which can be used to enable SRIOV:
 
 ```shell
 /usr/lib/nvidia/sriov-manage -e slot:bus:domain.function
 ```
 
-After running the script without errors, virtual functions will be enabled for
-the GPU:
+After running the script without errors, virtual functions will be enabled for the GPU:
 
 ```shell
 ls -l /sys/bus/pci/devices/<slot:bus:domain.function>/ | grep virtfn
@@ -168,8 +166,7 @@ Make sure that the vGPU type has available instances:
 cat /sys/bus/pci/devices/<slot:bus:domain.function>/mdev_supported_types/nvidia-<vgpu_type_id>/available_instances
 ```
 
-To create an mdev device then, write an UUIDv4 to the `create` file in the vGPU
-type's subdirectory:
+To create an mdev device then, write an UUIDv4 to the `create` file in the vGPU type's subdirectory:
 
 ```shell
 echo $(uuidgen) | sudo tee /sys/bus/pci/devices/<slot:bus:domain.function>/mdev_supported_types/nvidia-<vgpu_type_id>/create
@@ -179,9 +176,7 @@ The vGPU's UUID will be echoed back to the console by *tee*.
 
 ### Creating a SRIOV-backed vGPU
 
-This procedure is similar to the [legacy vGPU
-creation](#creating-a-legacy-vgpu), but each vGPU will be created on a separate
-virtual function, which contains its own *mdev_supported_types* directory.
+This procedure is similar to the [legacy vGPU creation](#creating-a-legacy-vgpu), but each vGPU will be created on a separate virtual function, which contains its own *mdev_supported_types* directory.
 
 First get the supported types for the virtual function you chose:
 
@@ -233,8 +228,7 @@ sudo mdevctl define --auto --uuid <uuid>
 
 ### Deleting a vGPU
 
-You can delete a vGPU by writing `"1"` to the vGPU's subdirectory (remove
-the `<virtfn_no>/` part for legacy vGPUs which doesn't support SRIOV):
+You can delete a vGPU by writing `"1"` to the vGPU's subdirectory (remove the `<virtfn_no>/` part for legacy vGPUs which doesn't support SRIOV):
 
 ```shell
 echo "1" \
