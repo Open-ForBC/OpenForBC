@@ -190,7 +190,9 @@ the GPU:
 ls -l /sys/bus/pci/devices/<slot:bus:domain.function>/ | grep virtfn
 ```
 
-### Creating a legacy vGPU
+### Creating a legacy vGPU (for GPUs that do not support sriov)
+
+*Note: These instructions are from [nVidia](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index.html#creating-legacy-vgpu-device-red-hat-el-kvm), not yet tested*
 
 First, get the supported types names for your GPU:
 
@@ -204,7 +206,7 @@ Then find out the type's subdirectory name (`nvidia-*`):
 grep -l <vgpu_type_name> /sys/bus/pci/devices/<slot:bus:domain.function>/mdev_supported_types/*/name
 ```
 
-Make sure that the vGPU type has avaibale instances:
+Make sure that the vGPU type has available instances:
 
 ```shell
 cat /sys/bus/pci/devices/<slot:bus:domain.function>/mdev_supported_types/nvidia-<vgpu_type_id>/available_instances
