@@ -1,6 +1,6 @@
 # NVIDIA vGPU
 
-NVIDIA vGPU is a proprietary technology which allows multiple VMs to access a single physical GPU. This allows dedicated graphics pass-through to multiple VMs using a single card.
+NVIDIA vGPU is a proprietary technology which allows multiple VMs to access a single physical GPU. This allows dedicated graphics pass-through to multiple VMs using a single card. This documentation is based on the official nVidia [doc](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index.html).
 
 ## Features
 
