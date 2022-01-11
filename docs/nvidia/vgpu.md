@@ -58,7 +58,9 @@ Time-sliced vGPUs running on a GPU share access to all the GPU's engines, proces
 
 #### MIG-backed vGPUs
 
-MIG-backed vGPUs all have exclusive access to its [GPU instance](./mig.md#mig-gpu-instance)'s engines. All the vGPUs running in a MIG compatible GPU run simultaneously.
+MIG-backed vGPUs all have exclusive access to its [GPU
+instance](./mig.md#gpu-instances)'s engines. All the vGPUs running in a MIG
+compatible GPU run simultaneously.
 
 ### vGPU types
 
