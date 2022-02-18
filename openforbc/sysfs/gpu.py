@@ -1,25 +1,15 @@
 from __future__ import annotations
+from pathlib import Path
 from typing import TYPE_CHECKING
+from uuid import uuid4
+
+from openforbc.sysfs import SysFsHandle
+from openforbc.sysfs.mdev import MdevTypeException
 
 if TYPE_CHECKING:
     from typing import Optional
-    from openforbc.gpu import GPU
-
-
-from pathlib import Path
-from uuid import UUID, uuid4
-
-
-class MdevTypeException(Exception):
-    pass
-
-
-class SysFsHandle:
-    def __init__(self, device_path: Path) -> None:
-        self._path = device_path.resolve()
-
-    def __repr__(self) -> str:
-        return str(self._path.name)
+    from openforbc.gpu.nvidia.gpu import NvidiaGPU
+    from openforbc.sysfs.mdev import MdevSysFsHandle
 
 
 class GPUSysFsHandle(SysFsHandle):
@@ -27,10 +17,12 @@ class GPUSysFsHandle(SysFsHandle):
         super().__init__(device_path)
 
     @classmethod
-    def from_gpu(cls, gpu: GPU) -> GPUSysFsHandle:
+    def from_gpu(cls, gpu: NvidiaGPU) -> GPUSysFsHandle:
         return cls(Path("/sys", "bus", "pci", "devices", gpu.get_pci_id()))
 
     def create_mdev(self, type: str) -> MdevSysFsHandle:
+        from openforbc.sysfs.mdev import MdevSysFsHandle
+
         uuid = uuid4()
         try:
             (self._path / "mdev_supported_types" / type / "create").write_text(
@@ -44,6 +36,8 @@ class GPUSysFsHandle(SysFsHandle):
         return MdevSysFsHandle.from_uuid(uuid)
 
     def get_mdev_devices(self) -> list[MdevSysFsHandle]:
+        from openforbc.sysfs.mdev import MdevSysFsHandle
+
         if not self.get_mdev_supported():
             return []
 
@@ -110,33 +104,3 @@ class GPUSysFsHandle(SysFsHandle):
             vfs.append(GPUSysFsHandle((self._path / f"virtfn{pos}")))
 
         return vfs
-
-
-class MdevDevicePathException(Exception):
-    pass
-
-
-class MdevSysFsHandle(SysFsHandle):
-    def __init__(self, device_path: Path) -> None:
-        if not (device_path / "mdev_type").is_dir():
-            raise MdevDevicePathException(
-                f"{device_path} is not a valid mdev device path"
-            )
-
-        super().__init__(device_path)
-
-    @classmethod
-    def from_uuid(cls, uuid: UUID) -> MdevSysFsHandle:
-        return cls(Path(f"/sys/bus/mdev/devices/{uuid}"))
-
-    def get_mdev_type(self) -> str:
-        return (self._path / "mdev_type").resolve().name
-
-    def get_parent_gpu(self) -> GPUSysFsHandle:
-        return GPUSysFsHandle(self._path.resolve().parent)
-
-    def get_uuid(self) -> UUID:
-        return UUID(self._path.resolve().name)
-
-    def remove(self) -> None:
-        (self._path / "remove").write_text("1\n")

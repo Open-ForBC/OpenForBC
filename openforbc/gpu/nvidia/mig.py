@@ -1,0 +1,7 @@
+from enum import Enum
+from pynvml import NVML_DEVICE_MIG_DISABLE, NVML_DEVICE_MIG_ENABLE
+
+
+class MIGModeStatus(Enum):
+    DISABLE = NVML_DEVICE_MIG_DISABLE
+    ENABLE = NVML_DEVICE_MIG_ENABLE

@@ -1,148 +1,62 @@
 from __future__ import annotations
+from pynvml import (
+    nvmlDeviceGetCount,
+    nvmlDeviceGetCreatableVgpus,
+    nvmlDeviceGetMigMode,
+    nvmlDeviceGetName,
+    nvmlDeviceGetSupportedVgpus,
+    nvmlDeviceGetHandleByIndex,
+    nvmlDeviceGetHandleByPciBusId,
+    nvmlDeviceGetHostVgpuMode,
+    nvmlDeviceGetPciInfo_v3,
+    nvmlDeviceGetUUID,
+    nvmlVgpuTypeGetMaxInstances,
+    nvmlInit,
+    nvmlShutdown,
+)
 from typing import TYPE_CHECKING
+from uuid import UUID
 
-from openforbc.sysfs import GPUSysFsHandle, MdevSysFsHandle
+from openforbc.gpu.generic import GPU, GPUPartition, GPUPartitionType
+from openforbc.gpu.nvidia.nvml import nvml
+from openforbc.gpu.nvidia.vgpu import (
+    VGPUCreateException,
+    VGPUInstance,
+    VGPUMode,
+    VGPUType,
+)
+from openforbc.gpu.nvidia.mig import MIGModeStatus
+from openforbc.sysfs.gpu import GPUSysFsHandle
 
 if TYPE_CHECKING:
     from ctypes import pointer
-    from uuid import UUID
-
-from contextlib import contextmanager
-from enum import Enum
-from pynvml import (
-    NVML_DEVICE_MIG_DISABLE,
-    NVML_DEVICE_MIG_ENABLE,
-    NVML_HOST_VGPU_MODE_NON_SRIOV,
-    NVML_HOST_VGPU_MODE_SRIOV,
-    struct_c_nvmlDevice_t,
-    nvmlInit,
-    nvmlDeviceGetCount,
-    nvmlDeviceGetHandleByIndex,
-    nvmlDeviceGetHandleByPciBusId,
-    nvmlDeviceGetCreatableVgpus,
-    nvmlDeviceGetHostVgpuMode,
-    nvmlDeviceGetMigMode,
-    nvmlDeviceGetName,
-    nvmlDeviceGetPciInfo_v3,
-    nvmlDeviceGetSupportedVgpus,
-    nvmlVgpuTypeGetClass,
-    nvmlVgpuTypeGetFramebufferSize,
-    nvmlVgpuTypeGetGpuInstanceProfileId,
-    nvmlVgpuTypeGetMaxInstances,
-    nvmlVgpuTypeGetName,
-    nvmlShutdown,
-)
+    from pynvml import struct_c_nvmlDevice_t
+    from typing import Sequence
 
 
-@contextmanager
-def nvml():
-    nvmlInit()
-    yield
-    nvmlShutdown()
-
-
-class VGPUType:
-    def __init__(
-        self, id: int, name: str, vgpu_class: str, fb_size: int, gip_id: int
-    ) -> None:
-        self.id = id
-        self.name = name
-        self.vgpu_class = vgpu_class
-        self.fb_size = fb_size
-        self.is_mig = gip_id != 0xFFFFFFFF
-        self.gip_id = gip_id
-
-    def __repr__(self) -> str:
-        return f"{self.id}: {self.name}{' (MIG)' if self.is_mig else ''}"
-
-    @classmethod
-    def from_id(cls, id: int) -> VGPUType:
-        with nvml():
-            return VGPUType(
-                id,
-                nvmlVgpuTypeGetName(id).decode(),
-                nvmlVgpuTypeGetClass(id).decode(),
-                nvmlVgpuTypeGetFramebufferSize(id),
-                nvmlVgpuTypeGetGpuInstanceProfileId(id),
-            )
-
-    def get_mdev_type(self) -> str:
-        return f"nvidia-{self.id}"
-
-
-class MIGModeStatus(Enum):
-    DISABLE = NVML_DEVICE_MIG_DISABLE
-    ENABLE = NVML_DEVICE_MIG_ENABLE
-
-
-class VGPUMode(Enum):
-    NON_SRIOV = NVML_HOST_VGPU_MODE_NON_SRIOV
-    SRIOV = NVML_HOST_VGPU_MODE_SRIOV
-
-
-class VGPUCreateException(Exception):
-    pass
-
-
-class VGPUTypeException(Exception):
-    pass
-
-
-class VGPUInstance:
-    def __init__(
-        self, sysfs_handle: MdevSysFsHandle, uuid: UUID, type: VGPUType
-    ) -> None:
-        self._sysfs_handle = sysfs_handle
-        self.uuid = uuid
-        self.type = type
-
-    def __repr__(self) -> str:
-        return f"{self.type} {self.uuid} on {self._sysfs_handle.get_parent_gpu()}"
-
-    @classmethod
-    def from_sysfs_handle(cls, sysfs_handle: MdevSysFsHandle) -> VGPUInstance:
-        UUID
-        uuid = sysfs_handle.get_uuid()
-        mdev_type = sysfs_handle.get_mdev_type()
-        if not mdev_type.startswith("nvidia-"):
-            raise VGPUTypeException(f"VGPU type not recognized: {mdev_type}")
-        type = VGPUType.from_id(int(mdev_type[len("nvidia-") :]))
-
-        return cls(sysfs_handle, uuid, type)
-
-    @classmethod
-    def from_mdev_uuid(cls, uuid: UUID) -> VGPUInstance:
-        return cls.from_sysfs_handle(MdevSysFsHandle.from_uuid(uuid))
-
-    def destroy(self) -> None:
-        self._sysfs_handle.remove()
-
-    def get_parent_gpu(self) -> GPU:
-        parent_dev = self._sysfs_handle.get_parent_gpu()
-        if parent_dev.get_sriov_is_vf():
-            parent_dev = parent_dev.get_sriov_physfn()
-
-        return GPU.from_pci_bus_id(self._sysfs_handle.get_parent_gpu().get_pci_bus_id())
-
-
-class GPU:
+class NvidiaGPU(GPU):
     _ref_count = 0
 
     @classmethod
-    def from_nvml_handle(cls, dev: pointer[struct_c_nvmlDevice_t]) -> GPU:
+    def from_nvml_handle(cls, dev: pointer[struct_c_nvmlDevice_t]) -> NvidiaGPU:
+        uuid = nvmlDeviceGetUUID(dev).decode()
+        if uuid.startswith("GPU-"):
+            uuid = uuid[len("GPU-") :]
+
         return cls(
             dev,
             nvmlDeviceGetName(dev).decode(),
+            UUID(uuid),
             [VGPUType.from_id(id) for id in nvmlDeviceGetSupportedVgpus(dev)],
         )
 
     @classmethod
-    def from_pci_bus_id(cls, bus_id: str) -> GPU:
+    def from_pci_bus_id(cls, bus_id: str) -> NvidiaGPU:
         with nvml():
             return cls.from_nvml_handle(nvmlDeviceGetHandleByPciBusId(bus_id.encode()))
 
     @classmethod
-    def get_gpus(cls):
+    def get_gpus(cls) -> list[NvidiaGPU]:
         with nvml():
             return [
                 cls.from_nvml_handle(nvmlDeviceGetHandleByIndex(i))
@@ -153,23 +67,38 @@ class GPU:
         self,
         nvml_dev: pointer[struct_c_nvmlDevice_t],
         name: str,
+        uuid: UUID,
         supported_vgpu_types: list[VGPUType],
     ) -> None:
-        if not GPU._ref_count:
+        super().__init__(name, uuid)
+
+        if not NvidiaGPU._ref_count:
             nvmlInit()
-        GPU._ref_count += 1
+        NvidiaGPU._ref_count += 1
 
         self._nvml_dev = nvml_dev
-        self.name = name
         self.supported_vgpu_types = supported_vgpu_types
 
     def __del__(self) -> None:
-        GPU._ref_count -= 1
-        if not GPU._ref_count:
+        NvidiaGPU._ref_count -= 1
+        if not NvidiaGPU._ref_count:
             nvmlShutdown()
 
     def __repr__(self) -> str:
         return self.name
+
+    def get_supported_types(self) -> Sequence[GPUPartitionType]:
+        return self.supported_vgpu_types
+
+    def get_creatable_types(self) -> Sequence[GPUPartitionType]:
+        return self.get_creatable_vgpus()
+
+    def create_partition(self, type: GPUPartitionType) -> GPUPartition:
+        assert isinstance(type, VGPUType)
+        return self.create_vgpu(type)
+
+    def get_partitions(self) -> Sequence[GPUPartition]:
+        return self.get_created_vgpus()
 
     def create_vgpu(self, type: VGPUType) -> VGPUInstance:
         sysfs_handle = self.get_sysfs_handle()
