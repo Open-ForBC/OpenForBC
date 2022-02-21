@@ -7,6 +7,7 @@ from pynvml import (
     nvmlDeviceGetSupportedVgpus,
     nvmlDeviceGetHandleByIndex,
     nvmlDeviceGetHandleByPciBusId,
+    nvmlDeviceGetHandleByUUID,
     nvmlDeviceGetHostVgpuMode,
     nvmlDeviceGetPciInfo_v3,
     nvmlDeviceGetUUID,
@@ -38,22 +39,35 @@ class NvidiaGPU(GPU):
     _ref_count = 0
 
     @classmethod
+    def from_nvml_handle_uuid(
+        cls, dev: pointer[struct_c_nvmlDevice_t], uuid: UUID
+    ) -> NvidiaGPU:
+        return cls(
+            dev,
+            nvmlDeviceGetName(dev).decode(),
+            uuid,
+            [VGPUType.from_id(id) for id in nvmlDeviceGetSupportedVgpus(dev)],
+        )
+
+    @classmethod
     def from_nvml_handle(cls, dev: pointer[struct_c_nvmlDevice_t]) -> NvidiaGPU:
         uuid = nvmlDeviceGetUUID(dev).decode()
         if uuid.startswith("GPU-"):
             uuid = uuid[len("GPU-") :]
 
-        return cls(
-            dev,
-            nvmlDeviceGetName(dev).decode(),
-            UUID(uuid),
-            [VGPUType.from_id(id) for id in nvmlDeviceGetSupportedVgpus(dev)],
-        )
+        return cls.from_nvml_handle_uuid(dev, uuid)
 
     @classmethod
     def from_pci_bus_id(cls, bus_id: str) -> NvidiaGPU:
         with nvml():
             return cls.from_nvml_handle(nvmlDeviceGetHandleByPciBusId(bus_id.encode()))
+
+    @classmethod
+    def from_uuid(cls, uuid: UUID):
+        with nvml():
+            return cls.from_nvml_handle_uuid(
+                nvmlDeviceGetHandleByUUID(f"GPU-{uuid}".encode()), uuid
+            )
 
     @classmethod
     def get_gpus(cls) -> list[NvidiaGPU]:

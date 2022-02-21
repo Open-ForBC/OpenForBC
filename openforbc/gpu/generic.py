@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
+from enum import IntEnum
 from typing import TYPE_CHECKING
 
 
@@ -23,6 +23,13 @@ class GPU(_GPU, ABC):
 
         return NvidiaGPU.get_gpus()
 
+    @classmethod
+    @abstractmethod
+    def from_uuid(cls, uuid: UUID) -> GPU:
+        from openforbc.gpu.nvidia.gpu import NvidiaGPU
+
+        return NvidiaGPU.from_uuid(uuid)
+
     @abstractmethod
     def get_supported_types(self) -> Sequence[GPUPartitionType]:
         ...
@@ -40,7 +47,7 @@ class GPU(_GPU, ABC):
         ...
 
 
-class GPUPartitionTechnology(Enum):
+class GPUPartitionTechnology(IntEnum):
     NVIDIA_VGPU_MIG = 1
     NVIDIA_VGPU_TIMESHARED = 2
 
