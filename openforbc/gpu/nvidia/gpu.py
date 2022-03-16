@@ -30,8 +30,7 @@ from openforbc.gpu.nvidia.mig import MIGModeStatus
 from openforbc.sysfs.gpu import GPUSysFsHandle
 
 if TYPE_CHECKING:
-    from ctypes import pointer
-    from pynvml import struct_c_nvmlDevice_t
+    from openforbc.gpu.nvidia.nvml import NVMLDevice
     from typing import Sequence
 
 
@@ -39,9 +38,7 @@ class NvidiaGPU(GPU):
     _ref_count = 0
 
     @classmethod
-    def from_nvml_handle_uuid(
-        cls, dev: pointer[struct_c_nvmlDevice_t], uuid: UUID
-    ) -> NvidiaGPU:
+    def from_nvml_handle_uuid(cls, dev: NVMLDevice, uuid: UUID) -> NvidiaGPU:
         return cls(
             dev,
             nvmlDeviceGetName(dev).decode(),
@@ -50,7 +47,7 @@ class NvidiaGPU(GPU):
         )
 
     @classmethod
-    def from_nvml_handle(cls, dev: pointer[struct_c_nvmlDevice_t]) -> NvidiaGPU:
+    def from_nvml_handle(cls, dev: NVMLDevice) -> NvidiaGPU:
         uuid = nvmlDeviceGetUUID(dev).decode()
         if uuid.startswith("GPU-"):
             uuid = uuid[len("GPU-") :]
@@ -79,7 +76,7 @@ class NvidiaGPU(GPU):
 
     def __init__(
         self,
-        nvml_dev: pointer[struct_c_nvmlDevice_t],
+        nvml_dev: NVMLDevice,
         name: str,
         uuid: UUID,
         supported_vgpu_types: list[VGPUType],
