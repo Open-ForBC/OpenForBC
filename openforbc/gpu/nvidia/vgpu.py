@@ -18,6 +18,8 @@ from openforbc.sysfs.mdev import MdevSysFsHandle
 if TYPE_CHECKING:
     from openforbc.gpu.nvidia.gpu import NvidiaGPU
 
+INVALID_GPU_INSTANCE_PROFILE_ID = 0xFFFFFFFF
+
 
 class VGPUMode(Enum):
     NON_SRIOV = NVML_HOST_VGPU_MODE_NON_SRIOV
@@ -36,7 +38,7 @@ class VGPUType(GPUPartitionType):
     def __init__(
         self, id: int, name: str, vgpu_class: str, fb_size: int, gip_id: int
     ) -> None:
-        is_mig = gip_id != 0xFFFFFFFF
+        is_mig = gip_id != INVALID_GPU_INSTANCE_PROFILE_ID
         super().__init__(
             name,
             id,
