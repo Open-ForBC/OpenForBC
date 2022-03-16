@@ -1,5 +1,5 @@
 from __future__ import annotations
-from enum import Enum
+from enum import IntEnum
 from pynvml import (
     nvmlVgpuTypeGetName,
     nvmlVgpuTypeGetClass,
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 INVALID_GPU_INSTANCE_PROFILE_ID = 0xFFFFFFFF
 
 
-class VGPUMode(Enum):
+class VGPUMode(IntEnum):
     NON_SRIOV = NVML_HOST_VGPU_MODE_NON_SRIOV
     SRIOV = NVML_HOST_VGPU_MODE_SRIOV
 
