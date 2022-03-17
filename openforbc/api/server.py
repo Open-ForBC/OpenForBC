@@ -73,3 +73,11 @@ def delete_gpu_partition(uuid: UUID, p_uuid: UUID) -> Response:
     partition.destroy()
 
     return jsonify({"ok": True})
+
+
+def run() -> None:
+    app.run()
+
+
+if __name__ == "__main__":
+    app.run()
