@@ -8,12 +8,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Sequence
     from uuid import UUID
+    from openforbc.pci import PCIID
 
 
 @dataclass
 class _GPU:
     name: str
     uuid: UUID
+    pciid: PCIID
 
 
 class GPU(_GPU, ABC):

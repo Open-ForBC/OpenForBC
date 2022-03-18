@@ -1,6 +1,6 @@
-from uuid import UUID
 from typer import echo, Typer
 from requests import Session
+from uuid import UUID
 
 from openforbc.cli.state import state
 

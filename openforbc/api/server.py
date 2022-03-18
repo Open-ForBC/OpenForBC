@@ -13,7 +13,12 @@ app = Flask(__name__)
 
 @app.route("/gpu")
 def list_gpus() -> Response:
-    return jsonify(GPU.get_gpus())
+    return jsonify(
+        list(
+            {"name": gpu.name, "uuid": gpu.uuid, "pciid": gpu.pciid.__repr__()}
+            for gpu in GPU.get_gpus()
+        )
+    )
 
 
 @app.route("/gpu/<uuid>/types")

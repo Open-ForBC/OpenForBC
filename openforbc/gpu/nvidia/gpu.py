@@ -27,6 +27,7 @@ from openforbc.gpu.nvidia.vgpu import (
     VGPUType,
 )
 from openforbc.gpu.nvidia.mig import MIGModeStatus
+from openforbc.pci import PCIID
 from openforbc.sysfs.gpu import GPUSysFsHandle
 
 if TYPE_CHECKING:
@@ -43,6 +44,7 @@ class NvidiaGPU(GPU):
             dev,
             nvmlDeviceGetName(dev).decode(),
             uuid,
+            PCIID.from_int(nvmlDeviceGetPciInfo_v3(dev).pciDeviceId),
             [VGPUType.from_id(id) for id in nvmlDeviceGetSupportedVgpus(dev)],
         )
 
@@ -79,9 +81,10 @@ class NvidiaGPU(GPU):
         nvml_dev: NVMLDevice,
         name: str,
         uuid: UUID,
+        pciid: PCIID,
         supported_vgpu_types: list[VGPUType],
     ) -> None:
-        super().__init__(name, uuid)
+        super().__init__(name, uuid, pciid)
 
         if not NvidiaGPU._ref_count:
             nvmlInit()
