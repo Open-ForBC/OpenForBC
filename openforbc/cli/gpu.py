@@ -1,0 +1,144 @@
+from typing import TYPE_CHECKING, Optional, TypedDict
+from uuid import UUID, uuid4
+from typer import Context, echo, Exit, Option, Typer
+from requests import Session
+
+from openforbc.cli.state import state as global_state
+
+if TYPE_CHECKING:
+    from typing import Dict
+
+CLIGPUState = TypedDict("CLIGPUState", {"gpu_uuid": UUID})
+
+app = Typer(help="Operate on GPUs")
+
+state: CLIGPUState = {"gpu_uuid": uuid4()}
+
+
+@app.callback(invoke_without_command=True)
+def callback(
+    ctx: Context,
+    gpu_id: str = Option(None, "--gpu-id", "-i"),
+    gpu_uuid: Optional[UUID] = Option(None, "--gpu-uuid", "-u"),
+) -> None:
+    if ctx.invoked_subcommand is None:
+        return ctx.invoke(list_gpus)
+    if ctx.invoked_subcommand == "list":
+        return
+
+    if gpu_uuid is None:
+        if gpu_id is None:
+            echo("ERROR: neither gpu_id nor gpu_uuid specified!", err=True)
+            raise Exit(1)
+
+        pciid, pos_s = gpu_id.split("-")
+        pos = int(pos_s)
+        pciids_count: Dict[str, int] = {}
+
+        with Session() as s:
+            r = s.send(global_state["api_client"].get_gpus())
+            gpus = r.json()
+            assert isinstance(gpus, list)
+            gpus.sort(key=lambda x: x["uuid"])
+            for gpu in gpus:
+                pciids_count[gpu["pciid"]] = (
+                    pciids_count[gpu["pciid"]] + 1
+                    if gpu["pciid"] in pciids_count
+                    else 0
+                )
+                if gpu["pciid"] == pciid and pciids_count[pciid] == pos:
+                    state["gpu_uuid"] = UUID(gpu["uuid"])
+                    return
+
+            echo("ERROR: specified gpu_id not found!", err=True)
+            raise Exit(1)
+    else:
+        state["gpu_uuid"] = gpu_uuid
+
+
+@app.command("list")
+def list_gpus() -> None:
+    """List GPUs."""
+    with Session() as s:
+        r = s.send(global_state["api_client"].get_gpus())
+        gpus = r.json()
+        assert isinstance(gpus, list)
+        gpus.sort(key=lambda x: x["pciid"])
+        pciids_count: Dict[str, int] = {}
+        for gpu in gpus:
+            pciids_count[gpu["pciid"]] = (
+                pciids_count[gpu["pciid"]] + 1 if gpu["pciid"] in pciids_count else 0
+            )
+            assert "name" in gpu
+            assert "uuid" in gpu
+            echo(
+                f'[{gpu["pciid"]}-{pciids_count[gpu["pciid"]]}] '
+                f'{gpu["uuid"]}: {gpu["name"]}'
+            )
+
+
+@app.command("types")
+def list_supported_types(creatable: bool = Option(False, "--creatable", "-c")) -> None:
+    """List supported partition types."""
+    gpu_uuid = get_gpu_uuid(state)
+
+    with Session() as s:
+        client = global_state["api_client"]
+        r = s.send(
+            client.get_creatable_types(gpu_uuid)
+            if creatable
+            else client.get_supported_types(gpu_uuid)
+        )
+        types = r.json()
+        assert isinstance(types, list)
+        for type in types:
+            assert "name" in type
+            assert "id" in type
+            assert "memory" in type
+            echo(f'{type["id"]}: {type["name"]} ({type["memory"] / 2**30}GiB)')
+
+
+part = Typer(help="List and create GPU partitions")
+app.add_typer(part, name="partition")
+
+
+@part.callback(invoke_without_command=True)
+def part_callback(ctx: Context) -> None:
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(list_partitions)
+
+
+@part.command("list")
+def list_partitions() -> None:
+    """List GPU partitions."""
+    with Session() as s:
+        r = s.send(global_state["api_client"].get_partitions(get_gpu_uuid(state)))
+        partitions = r.json()
+        assert isinstance(partitions, list)
+        for partition in partitions:
+            assert "uuid" in partition
+            assert "type_id" in partition
+            echo(f'{partition["uuid"]}: {partition["type_id"]}')
+
+
+@part.command("create")
+def create_partition(type_id: int) -> None:
+    """Create a GPU partition."""
+    with Session() as s:
+        r = s.send(
+            global_state["api_client"].create_partition(get_gpu_uuid(state), type_id)
+        )
+        rj = r.json()
+        assert "ok" in rj
+
+
+def get_gpu_uuid(state: CLIGPUState) -> UUID:
+    if state["gpu_uuid"] is None:
+        with Session() as s:
+            r = s.send(global_state["api_client"].get_gpus())
+            gpus = r.json()
+            assert isinstance(gpus, list)
+            gpus.sort(key=lambda x: x["uuid"])
+            return gpus[state["gpu_pos"]]["uuid"]
+
+    return state["gpu_uuid"]

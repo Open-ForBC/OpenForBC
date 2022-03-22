@@ -1,0 +1,31 @@
+[tool.poetry]
+authors = ["Daniele Monteleone <daniele.monteleone.it@gmail.com>"]
+description = ""
+license = "MIT"
+name = "openforbc"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+pynvml = "^11.4.1"
+Flask = "^2.0.3"
+typer = "^0.4.0"
+requests = "^2.27.1"
+
+[tool.poetry.dev-dependencies]
+black = "^21.12b0"
+flake8-annotations = "^2.7.0"
+flake8-comprehensions = "^3.7.0"
+flake8-docstrings = "^1.6.0"
+flake8-simplify = "^0.14.5"
+flake8-type-checking = "^1.2.0"
+mypy = "^0.931"
+types-requests = "^2.27.13"
+
+[tool.poetry.scripts]
+openforbc = "openforbc.cli.app:run"
+openforbcd = "openforbc.api.server:run"
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0"]

@@ -1,0 +1,11 @@
+[flake8]
+ban-relative-imports = true
+enable-extensions = TC, TC1
+extend-ignore =
+    # E203 whitespace before ':'
+    E203
+    # ANN101 Missing type annotation for self in method
+    ANN101,
+    # ANN102 Missing type annotation for cls in classmethod
+    ANN102,
+max-line-length = 89
