@@ -130,6 +130,9 @@ def create_partition(type_id: int) -> None:
         )
         rj = r.json()
         assert "ok" in rj
+        assert "uuid" in rj
+
+    echo(UUID(rj.uuid))
 
 
 def get_gpu_uuid(state: CLIGPUState) -> UUID:
