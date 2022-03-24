@@ -135,6 +135,30 @@ def create_partition(type_id: int) -> None:
     echo(UUID(rj.uuid))
 
 
+@part.command("get")
+def get_partition_definition(partition_uuid: UUID):
+    """Get libvirt XML definition for selected partition."""
+    with Session() as s:
+        r = s.send(global_state["api_client"].get_partitions(get_gpu_uuid(state)))
+        partitions = r.json()
+        assert isinstance(partitions, list)
+
+    if not [True for x in partitions if UUID(x["uuid"]) == partition_uuid]:
+        echo(f'ERROR: no such partition "{partition_uuid}".', err=True)
+        raise Exit(1)
+
+    echo("NOTE: please ensure that PCI domain:bus:slot.function is not already used.")
+    echo(
+        f"""
+<hostdev mode='subsystem' type='mdev' managed='no' model='vfio-pci' display='on'>
+  <source>
+    <address uuid='{partition_uuid}'/>
+  </source>
+  <address type='pci' domain='0x0000' bus='0x00' slot='0x10' function='0x0'/>
+</hostdev>"""
+    )
+
+
 @part.command("destroy")
 def destroy_partition(partition_uuid: UUID):
     """Destroy the selected partition."""
