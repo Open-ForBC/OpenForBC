@@ -135,6 +135,20 @@ def create_partition(type_id: int) -> None:
     echo(UUID(rj.uuid))
 
 
+@part.command("destroy")
+def destroy_partition(partition_uuid: UUID):
+    """Destroy the selected partition."""
+    with Session() as s:
+        r = s.send(
+            global_state["api_client"].destroy_partition(
+                get_gpu_uuid(state), partition_uuid
+            )
+        )
+        json = r.json()
+        assert "ok" in json
+        assert json["ok"]
+
+
 def get_gpu_uuid(state: CLIGPUState) -> UUID:
     if state["gpu_uuid"] is None:
         with Session() as s:

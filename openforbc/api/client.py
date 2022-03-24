@@ -37,3 +37,10 @@ class APIClient:
             f"{self.base_url}/gpu/{gpu_uuid}/partition",
             data={"type_id": type_id},
         ).prepare()
+
+    def destroy_partition(
+        self, gpu_uuid: UUID, partition_uuid: UUID
+    ) -> PreparedRequest:
+        return Request(
+            "DELETE", f"{self.base_url}/gpu/{gpu_uuid}/partition/{partition_uuid}"
+        ).prepare()
