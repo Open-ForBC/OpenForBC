@@ -60,9 +60,9 @@ def create_gpu_partition(uuid: UUID) -> Response:
     if not next((True for x in gpu.get_creatable_types() if x.id == type_id), False):
         return abort(400, "unavailable partition type")
 
-    gpu.create_partition(part_type)
+    partition = gpu.create_partition(part_type)
 
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "uuid": partition.uuid})
 
 
 @app.delete("/gpu/<uuid:uuid>/partition/<uuid:p_uuid>")
