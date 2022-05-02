@@ -165,7 +165,7 @@ class NvidiaGPU(GPU):
         return MIGModeStatus(pending)
 
     def get_pci_id(self) -> str:
-        return nvmlDeviceGetPciInfo_v3(self._nvml_dev).busIdLegacy.decode()
+        return nvmlDeviceGetPciInfo_v3(self._nvml_dev).busIdLegacy.decode().lower()
 
     def get_sysfs_handle(self) -> GPUSysFsHandle:
         return GPUSysFsHandle.from_gpu(self)
