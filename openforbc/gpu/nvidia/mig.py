@@ -15,6 +15,7 @@ from pynvml import (
     nvmlDeviceGetGpuInstanceProfileInfo,
     nvmlGpuInstanceDestroy,
     nvmlGpuInstanceGetInfo,
+    nvmlGpuInstanceCreateComputeInstance,
     nvmlGpuInstanceGetComputeInstanceProfileInfo,
     nvmlGpuInstanceGetComputeInstances,
 )
@@ -111,8 +112,17 @@ class GPUInstance:
             dev, nvmlDeviceGetDeviceHandleFromMigDeviceHandle(dev)
         )
 
+    def create_compute_instance(
+        self, profile: ComputeInstanceProfile
+    ) -> ComputeInstance:
+        return ComputeInstance.from_nvml_handle_parent(
+            nvmlGpuInstanceCreateComputeInstance(self._nvml_dev, profile.id), self
+        )
+
     def destroy(self) -> None:
         """Destroy this GPU instance."""
+        for instance in self.get_compute_instances():
+            instance.destroy()
         nvmlGpuInstanceDestroy(self._nvml_dev)
 
     def get_compute_instance_profiles(self) -> list[ComputeInstanceProfile]:
