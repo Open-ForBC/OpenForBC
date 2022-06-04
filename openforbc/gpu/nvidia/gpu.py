@@ -1,6 +1,8 @@
 from __future__ import annotations
 from pynvml import (
+    NVML_SUCCESS,
     NVML_GPU_INSTANCE_PROFILE_COUNT,
+    NVMLError,
     NVMLError_NotSupported,
     nvmlDeviceCreateGpuInstance,
     nvmlDeviceGetCount,
@@ -9,6 +11,7 @@ from pynvml import (
     nvmlDeviceGetGpuInstanceProfileInfo,
     nvmlDeviceGetGpuInstances,
     nvmlDeviceGetName,
+    nvmlDeviceGetActiveVgpus,
     nvmlDeviceGetSupportedVgpus,
     nvmlDeviceGetHandleByIndex,
     nvmlDeviceGetHandleByPciBusId,
@@ -16,7 +19,8 @@ from pynvml import (
     nvmlDeviceGetHostVgpuMode,
     nvmlDeviceGetPciInfo_v3,
     nvmlDeviceGetUUID,
-    nvmlGpuInstanceCreateComputeInstance,
+    nvmlDeviceGetGpuInstanceRemainingCapacity,
+    nvmlDeviceSetMigMode,
     nvmlVgpuTypeGetMaxInstances,
     nvmlInit,
     nvmlShutdown,
@@ -28,10 +32,11 @@ from openforbc.gpu.nvidia.nvml import NVMLGpuInstance, nvml
 from openforbc.gpu.nvidia.vgpu import (
     VGPUCreateException,
     VGPUInstance,
+    VGPUMdev,
     VGPUMode,
     VGPUType,
 )
-from openforbc.gpu.nvidia.mig import GPUInstance, MIGModeStatus
+from openforbc.gpu.nvidia.mig import GPUInstance, GPUInstanceProfile, MIGModeStatus
 from openforbc.pci import PCIID
 from openforbc.sysfs.gpu import GPUSysFsHandle
 
@@ -126,14 +131,46 @@ class NvidiaGPU(GPU):
         return self.create_vgpu(type)
 
     def get_partitions(self) -> Sequence[GPUPartition]:
-        return self.get_created_vgpus()
+        return self.get_created_mdevs()
 
     def create_gpu_instance(self, profile_id: int) -> GPUInstance:
         handle = nvmlDeviceCreateGpuInstance(self._nvml_dev, profile_id)
-        nvmlGpuInstanceCreateComputeInstance(handle, 0)
-        return GPUInstance.from_nvml_handle_parent(handle, self)
+        instance = GPUInstance.from_nvml_handle_parent(handle, self)
+        for profile in instance.get_compute_instance_profiles():
+            if profile.slice_count == instance.profile.slice_count:
+                instance.create_compute_instance(profile)
+                break
 
-    def create_vgpu(self, type: VGPUType) -> VGPUInstance:
+        return handle
+
+    def create_gpu_instance_maybe(self, vgpu_type: VGPUType) -> None:
+        gpu_instances = self.get_gpu_instances()
+        vgpu_types = [mdev.type for mdev in self.get_created_mdevs()] + [vgpu_type]
+        for vgpu_type in vgpu_types:
+            gpu_instance = next(
+                (x for x in gpu_instances if x.profile.id == vgpu_type.gip_id), None
+            )
+            if gpu_instance:
+                gpu_instances.remove(gpu_instance)
+            else:
+                self.create_gpu_instance(vgpu_type.gip_id)
+
+    def create_vgpu(self, type: VGPUType) -> VGPUMdev:
+        required_mig_status = (
+            MIGModeStatus.ENABLE if type.is_mig else MIGModeStatus.DISABLE
+        )
+
+        if self.get_current_mig_status() != required_mig_status:
+            if self.get_created_mdevs():
+                raise VGPUCreateException(
+                    f"vGPU type {type} requires MIG mode change, "
+                    "but some mdevs are present"
+                )
+            self.set_mig_mode(required_mig_status)
+
+        if type.is_mig:
+            self.create_gpu_instance_maybe(type)
+
         sysfs_handle = self.get_sysfs_handle()
         if self.get_vgpu_mode() == VGPUMode.SRIOV:
             if not sysfs_handle.get_sriov_active():
@@ -150,27 +187,70 @@ class NvidiaGPU(GPU):
         if not sysfs_handle.get_mdev_type_available(mdev_type):
             raise VGPUCreateException(f"GPU {self} can't create any {type}")
 
-        return VGPUInstance.from_sysfs_handle(sysfs_handle.create_mdev(mdev_type))
+        return VGPUMdev.from_sysfs_handle(sysfs_handle.create_mdev(mdev_type))
 
-    def get_creatable_vgpus(self) -> list[VGPUType]:
+    def destroy_gpu_instance_maybe(self, profile: GPUInstanceProfile) -> None:
+        gpu_instances = [x for x in self.get_gpu_instances() if x.profile == profile]
+        if not gpu_instances:
+            return
+        mdevs = [
+            mdev for mdev in self.get_created_mdevs() if mdev.type.gip_id == profile.id
+        ]
+        for vgpu in self.get_active_vgpus():
+            gpu_instances = [
+                instance
+                for instance in gpu_instances
+                if instance.id != vgpu.get_gpu_instance_id()
+            ]
+            mdev = next(mdev for mdev in mdevs if mdev.type == vgpu.type)
+            mdevs.remove(mdev)
+
+        if len(gpu_instances) > len(mdevs):
+            gpu_instances.pop().destroy()
+
+    def get_active_vgpus(self) -> list[VGPUInstance]:
         return [
-            VGPUType.from_id(id) for id in nvmlDeviceGetCreatableVgpus(self._nvml_dev)
+            VGPUInstance.from_nvml(dev)
+            for dev in nvmlDeviceGetActiveVgpus(self._nvml_dev)
         ]
 
-    def get_created_vgpus(self) -> list[VGPUInstance]:
-        vgpus: list[VGPUInstance] = []
+    def get_creatable_vgpus(self) -> list[VGPUType]:
+        if not self.get_created_mdevs():
+            return self.supported_vgpu_types
+
+        supported_mig_vgpu_types = [
+            type for type in self.supported_vgpu_types if type.is_mig
+        ]
+
+        return (
+            [
+                type
+                for type in supported_mig_vgpu_types
+                if self.get_gpu_instance_remaining_capacity(
+                    GPUInstanceProfile.from_id(type.gip_id, self)
+                )
+            ]
+            if self.get_current_mig_status() == MIGModeStatus.ENABLE
+            else [
+                VGPUType.from_id(id)
+                for id in nvmlDeviceGetCreatableVgpus(self._nvml_dev)
+            ]
+        )
+
+    def get_created_mdevs(self) -> list[VGPUMdev]:
+        vgpus: list[VGPUMdev] = []
         sysfs_handle = GPUSysFsHandle.from_gpu(self)
 
         if sysfs_handle.get_mdev_supported():
             vgpus.extend(
-                VGPUInstance.from_sysfs_handle(dev)
+                VGPUMdev.from_sysfs_handle(dev)
                 for dev in sysfs_handle.get_mdev_devices()
             )
 
         if sysfs_handle.get_sriov_active():
             for vf in sysfs_handle.get_sriov_vfs():
                 vgpus.extend(
-                    VGPUInstance.from_sysfs_handle(dev) for dev in vf.get_mdev_devices()
+                    VGPUMdev.from_sysfs_handle(dev) for dev in vf.get_mdev_devices()
                 )
 
         return vgpus
@@ -182,6 +262,9 @@ class NvidiaGPU(GPU):
     def get_pending_mig_status(self) -> MIGModeStatus:
         _, pending = nvmlDeviceGetMigMode(self._nvml_dev)
         return MIGModeStatus(pending)
+
+    def get_gpu_instance_remaining_capacity(self, profile: GPUInstanceProfile) -> int:
+        return nvmlDeviceGetGpuInstanceRemainingCapacity(self._nvml_dev, profile.id)
 
     def get_gpu_instances(self) -> list[GPUInstance]:
         from ctypes import byref, c_uint
@@ -199,13 +282,11 @@ class NvidiaGPU(GPU):
             InstancesArray = NVMLGpuInstance * info.instanceCount
             c_count = c_uint()
             c_profile_instances = InstancesArray()
-            print(f"getting gpu instances for gip id {info.id}")
             nvmlDeviceGetGpuInstances(
                 self._nvml_dev, info.id, c_profile_instances, byref(c_count)
             )
 
             for i in range(c_count.value):
-                print(f"appending i: {i} for gip id {info.id}")
                 instances.append(
                     GPUInstance.from_nvml_handle_parent(c_profile_instances[i], self)
                 )
@@ -239,6 +320,11 @@ class NvidiaGPU(GPU):
             for x in self.get_creatable_vgpus()
             if self.get_vf_available_vgpu(vf_num, x)
         ]
+
+    def set_mig_mode(self, mode: MIGModeStatus) -> None:
+        status = nvmlDeviceSetMigMode(self._nvml_dev, mode)
+        if status != NVML_SUCCESS:
+            raise NVMLError(status)
 
     def set_sriov_enable(self, enable: bool) -> None:
         from subprocess import run
