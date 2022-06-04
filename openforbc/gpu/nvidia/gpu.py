@@ -1,8 +1,13 @@
 from __future__ import annotations
 from pynvml import (
+    NVML_GPU_INSTANCE_PROFILE_COUNT,
+    NVMLError_NotSupported,
+    nvmlDeviceCreateGpuInstance,
     nvmlDeviceGetCount,
     nvmlDeviceGetCreatableVgpus,
     nvmlDeviceGetMigMode,
+    nvmlDeviceGetGpuInstanceProfileInfo,
+    nvmlDeviceGetGpuInstances,
     nvmlDeviceGetName,
     nvmlDeviceGetSupportedVgpus,
     nvmlDeviceGetHandleByIndex,
@@ -11,28 +16,35 @@ from pynvml import (
     nvmlDeviceGetHostVgpuMode,
     nvmlDeviceGetPciInfo_v3,
     nvmlDeviceGetUUID,
+    nvmlGpuInstanceCreateComputeInstance,
     nvmlVgpuTypeGetMaxInstances,
     nvmlInit,
     nvmlShutdown,
 )
 from typing import TYPE_CHECKING
-from uuid import UUID
 
-from openforbc.gpu.generic import GPU, GPUPartition, GPUPartitionType
-from openforbc.gpu.nvidia.nvml import nvml
+from openforbc.gpu.generic import GPU
+from openforbc.gpu.nvidia.nvml import NVMLGpuInstance, nvml
 from openforbc.gpu.nvidia.vgpu import (
     VGPUCreateException,
     VGPUInstance,
     VGPUMode,
     VGPUType,
 )
-from openforbc.gpu.nvidia.mig import MIGModeStatus
+from openforbc.gpu.nvidia.mig import GPUInstance, MIGModeStatus
 from openforbc.pci import PCIID
 from openforbc.sysfs.gpu import GPUSysFsHandle
 
 if TYPE_CHECKING:
-    from openforbc.gpu.nvidia.nvml import NVMLDevice
     from typing import Sequence
+    from uuid import UUID
+
+    from openforbc.gpu.generic import GPUPartition, GPUPartitionType
+    from openforbc.gpu.nvidia.nvml import NVMLDevice
+
+
+class NvidiaGPUMIGDisabled(Exception):
+    pass
 
 
 class NvidiaGPU(GPU):
@@ -53,6 +65,8 @@ class NvidiaGPU(GPU):
         uuid = nvmlDeviceGetUUID(dev).decode()
         if uuid.startswith("GPU-"):
             uuid = uuid[len("GPU-") :]
+        if uuid.startswith("MIG-"):
+            uuid = uuid[len("MIG-") :]
 
         return cls.from_nvml_handle_uuid(dev, uuid)
 
@@ -99,7 +113,7 @@ class NvidiaGPU(GPU):
             nvmlShutdown()
 
     def __repr__(self) -> str:
-        return self.name
+        return f"{self.name} @{self.get_pci_id()}"
 
     def get_supported_types(self) -> Sequence[GPUPartitionType]:
         return self.supported_vgpu_types
@@ -113,6 +127,11 @@ class NvidiaGPU(GPU):
 
     def get_partitions(self) -> Sequence[GPUPartition]:
         return self.get_created_vgpus()
+
+    def create_gpu_instance(self, profile_id: int) -> GPUInstance:
+        handle = nvmlDeviceCreateGpuInstance(self._nvml_dev, profile_id)
+        nvmlGpuInstanceCreateComputeInstance(handle, 0)
+        return GPUInstance.from_nvml_handle_parent(handle, self)
 
     def create_vgpu(self, type: VGPUType) -> VGPUInstance:
         sysfs_handle = self.get_sysfs_handle()
@@ -163,6 +182,35 @@ class NvidiaGPU(GPU):
     def get_pending_mig_status(self) -> MIGModeStatus:
         _, pending = nvmlDeviceGetMigMode(self._nvml_dev)
         return MIGModeStatus(pending)
+
+    def get_gpu_instances(self) -> list[GPUInstance]:
+        from ctypes import byref, c_uint
+
+        if self.get_current_mig_status() != MIGModeStatus.ENABLE:
+            raise NvidiaGPUMIGDisabled
+
+        instances = []
+        for profile in range(NVML_GPU_INSTANCE_PROFILE_COUNT):
+            try:
+                info = nvmlDeviceGetGpuInstanceProfileInfo(self._nvml_dev, profile)
+            except NVMLError_NotSupported:
+                continue
+
+            InstancesArray = NVMLGpuInstance * info.instanceCount
+            c_count = c_uint()
+            c_profile_instances = InstancesArray()
+            print(f"getting gpu instances for gip id {info.id}")
+            nvmlDeviceGetGpuInstances(
+                self._nvml_dev, info.id, c_profile_instances, byref(c_count)
+            )
+
+            for i in range(c_count.value):
+                print(f"appending i: {i} for gip id {info.id}")
+                instances.append(
+                    GPUInstance.from_nvml_handle_parent(c_profile_instances[i], self)
+                )
+
+        return instances
 
     def get_pci_id(self) -> str:
         return nvmlDeviceGetPciInfo_v3(self._nvml_dev).busIdLegacy.decode().lower()
