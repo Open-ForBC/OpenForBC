@@ -73,9 +73,9 @@ class VGPUType(GPUPartitionType):
         with nvml():
             return cls(
                 id,
-                nvmlVgpuTypeGetName(id).decode(),
+                nvmlVgpuTypeGetName(id),
                 nvmlVgpuTypeGetFramebufferSize(id),
-                nvmlVgpuTypeGetClass(id).decode(),
+                nvmlVgpuTypeGetClass(id),
                 nvmlVgpuTypeGetGpuInstanceProfileId(id),
             )
 
