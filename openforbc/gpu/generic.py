@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import IntEnum
+from enum import Enum
 from typing import TYPE_CHECKING
 
 
@@ -49,9 +49,9 @@ class GPU(_GPU, ABC):
         ...
 
 
-class GPUPartitionTechnology(IntEnum):
-    NVIDIA_VGPU_MIG = 1
-    NVIDIA_VGPU_TIMESHARED = 2
+class GPUPartitionTechnology(str, Enum):
+    NVIDIA_VGPU_MIG = "vgpu+mig"
+    NVIDIA_VGPU_TIMESHARED = "vgpu"
 
 
 @dataclass

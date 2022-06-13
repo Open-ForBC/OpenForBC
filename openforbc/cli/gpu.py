@@ -4,6 +4,7 @@ from typer import Context, echo, Exit, Option, Typer
 from requests import Session
 
 from openforbc.cli.state import state as global_state
+from openforbc.gpu.generic import GPUPartitionTechnology
 
 if TYPE_CHECKING:
     from typing import Dict
@@ -81,8 +82,11 @@ def list_gpus() -> None:
 def list_supported_types(
     creatable: bool = Option(False, "--creatable", "-c"),
     id_only: bool = Option(False, "--id-only", "-q"),
+    technology: Optional[GPUPartitionTechnology] = Option(None, "--tech", "-t"),
 ) -> None:
     """List supported partition types."""
+    from openforbc.gpu.generic import GPUPartitionTechnology
+
     gpu_uuid = get_gpu_uuid(state)
 
     with Session() as s:
@@ -98,10 +102,17 @@ def list_supported_types(
             assert "name" in type
             assert "id" in type
             assert "memory" in type
+            assert "tech" in type
+            if technology and type["tech"] != technology:
+                continue
+
             echo(
                 type["id"]
                 if id_only
-                else f'{type["id"]}: {type["name"]} ({type["memory"] / 2**30}GiB)'
+                else (
+                    f'{type["id"]} ({GPUPartitionTechnology(type["tech"])}): '
+                    f'{type["name"]} ({type["memory"] / 2**30}GiB)'
+                )
             )
 
 
