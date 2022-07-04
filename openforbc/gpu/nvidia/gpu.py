@@ -59,7 +59,7 @@ class NvidiaGPU(GPU):
     def from_nvml_handle_uuid(cls, dev: NVMLDevice, uuid: UUID) -> NvidiaGPU:
         return cls(
             dev,
-            nvmlDeviceGetName(dev).decode(),
+            nvmlDeviceGetName(dev),
             uuid,
             PCIID.from_int(nvmlDeviceGetPciInfo_v3(dev).pciDeviceId),
             [VGPUType.from_id(id) for id in nvmlDeviceGetSupportedVgpus(dev)],
@@ -67,7 +67,7 @@ class NvidiaGPU(GPU):
 
     @classmethod
     def from_nvml_handle(cls, dev: NVMLDevice) -> NvidiaGPU:
-        uuid = nvmlDeviceGetUUID(dev).decode()
+        uuid = nvmlDeviceGetUUID(dev)
         if uuid.startswith("GPU-"):
             uuid = uuid[len("GPU-") :]
         if uuid.startswith("MIG-"):
@@ -294,7 +294,7 @@ class NvidiaGPU(GPU):
         return instances
 
     def get_pci_id(self) -> str:
-        return nvmlDeviceGetPciInfo_v3(self._nvml_dev).busIdLegacy.decode().lower()
+        return nvmlDeviceGetPciInfo_v3(self._nvml_dev).busIdLegacy.lower()
 
     def get_sysfs_handle(self) -> GPUSysFsHandle:
         return GPUSysFsHandle.from_gpu(self)
