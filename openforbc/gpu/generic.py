@@ -1,3 +1,6 @@
+# Copyright (c) 2021-2022 Istituto Nazionale di Fisica Nucleare
+# SPDX-License-Identifier: MIT
+
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
