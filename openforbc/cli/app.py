@@ -1,3 +1,6 @@
+# Copyright (c) 2021-2022 Istituto Nazionale di Fisica Nucleare
+# SPDX-License-Identifier: MIT
+
 from typer import Typer
 
 from openforbc.cli.gpu import app as gpu_app
