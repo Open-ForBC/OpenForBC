@@ -1,5 +1,9 @@
+# Copyright (c) 2021-2022 Istituto Nazionale di Fisica Nucleare
+# SPDX-License-Identifier: MIT
+
 from __future__ import annotations
 from flask import abort, Flask, jsonify, request
+from pynvml import NVMLError
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -7,17 +11,28 @@ from openforbc.gpu import GPU
 
 if TYPE_CHECKING:
     from flask import Response
+    from flask.typing import ResponseReturnValue
 
 app = Flask(__name__)
+
+
+@app.errorhandler(Exception)
+def handle_exception(e: Exception) -> ResponseReturnValue:
+    if isinstance(e, NVMLError):
+        app.logger.error("NVML error", exc_info=True)
+    else:
+        app.logger.error("Generic exception", exc_info=True)
+
+    return jsonify({"exception": repr(e)}), 500
 
 
 @app.route("/gpu")
 def list_gpus() -> Response:
     return jsonify(
-        list(
+        [
             {"name": gpu.name, "uuid": gpu.uuid, "pciid": gpu.pciid.__repr__()}
             for gpu in GPU.get_gpus()
-        )
+        ]
     )
 
 
