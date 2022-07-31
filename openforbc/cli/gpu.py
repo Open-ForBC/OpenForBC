@@ -86,11 +86,7 @@ def list_supported_types(
     gpu_uuid = get_gpu_uuid(state)
 
     client = global_state["api_client"]
-    types = (
-        client.get_creatable_types(gpu_uuid)
-        if creatable
-        else client.get_supported_types(gpu_uuid)
-    )
+    types = client.get_supported_types(gpu_uuid, creatable)
 
     assert isinstance(types, list)
     for type in types:

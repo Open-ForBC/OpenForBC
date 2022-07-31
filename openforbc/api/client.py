@@ -2,20 +2,31 @@
 # SPDX-License-Identifier: MIT
 
 from __future__ import annotations
+from logging import getLogger
 from typing import TYPE_CHECKING
+
+from requests import JSONDecodeError, Request
+from typer import Exit
+
+from openforbc.api import DEFAULT_BASE_URL
 
 if TYPE_CHECKING:
     from typing import Any
     from requests import PreparedRequest
     from uuid import UUID
 
-from requests import JSONDecodeError, Request
 
-from openforbc.api import DEFAULT_BASE_URL
+logger = getLogger(__name__)
 
 
 class APIException(Exception):
     """Base class for OpenForBC API exceptions."""
+
+    pass
+
+
+class BadRequest(APIException):
+    """Raised when some arguments are not accepted by the server."""
 
     pass
 
@@ -39,24 +50,24 @@ class ResponseDecodeFailed(APIException):
 
 
 class APIClient:
-    def __init__(self, base_url: str) -> None:
+    def __init__(self, base_url: str, cli: bool) -> None:
         self.base_url = base_url
+        self.cli = cli
 
     @classmethod
-    def default(cls) -> APIClient:
-        return cls(DEFAULT_BASE_URL)
+    def default(cls, cli: bool = True) -> APIClient:
+        return cls(DEFAULT_BASE_URL, cli)
 
     def get_gpus(self) -> Any:
         return self.send_request(Request("GET", url=f"{self.base_url}/gpu").prepare())
 
-    def get_supported_types(self, gpu_uuid: UUID) -> Any:
+    def get_supported_types(self, gpu_uuid: UUID, creatable: bool = False) -> Any:
         return self.send_request(
-            Request("GET", f"{self.base_url}/gpu/{gpu_uuid}/types").prepare()
-        )
-
-    def get_creatable_types(self, gpu_uuid: UUID) -> Any:
-        return self.send_request(
-            Request("GET", f"{self.base_url}/gpu/{gpu_uuid}/types/creatable").prepare()
+            Request(
+                "GET",
+                f"{self.base_url}/gpu/{gpu_uuid}/types"
+                + ("?creatable=1" if creatable else ""),
+            ).prepare()
         )
 
     def get_partitions(self, gpu_uuid: UUID) -> Any:
@@ -86,20 +97,38 @@ class APIClient:
 
         with Session() as s:
             r = s.send(request)
-            if r.status_code != codes.ok:
+            logger.debug('received: "%s"', r.text)
+            if r.status_code == codes.bad_request:
+                message = r.json()["detail"]
+                logger.error("bad request: %s", message)
+                raise Exit(1) if self.cli else BadRequest(message)
+            elif r.status_code != codes.ok:
                 try:
-                    exc_name = r.json()["exception"]
-                    raise DaemonException(
-                        f"Operation failed on daemon due to: {exc_name}"
+                    exc = r.json()["exc"]
+                    logger.error(
+                        "unhandled exception on daemon: %s. "
+                        "check daemon's log (`journalctl -u openforbcd -e`) for further "
+                        "information",
+                        exc,
+                    )
+                    raise Exit(1) if self.cli else DaemonException(
+                        f"Operation failed on daemon due to: {exc}"
                     )
                 except (JSONDecodeError, KeyError):
-                    raise ExceptionDecodeFailed(
+                    logger.warning("couldn't decode daemon exception")
+                    logger.error(
+                        'daemon replied with unexpected status: %s, with body: "%s"',
+                        r.status_code,
+                        r.text,
+                    )
+                    raise Exit(1) if self.cli else ExceptionDecodeFailed(
                         "Could not decode exception", r.content
                     ) from None
             try:
                 json = r.json()
             except JSONDecodeError:
-                raise ResponseDecodeFailed(
+                logger.error('couldn\'t decode response body as json, body: "%s"')
+                raise Exit(1) if self.cli else ResponseDecodeFailed(
                     "Could not decode server response", r.content
                 ) from None
 

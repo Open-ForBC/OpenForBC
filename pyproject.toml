@@ -7,10 +7,12 @@ version = "0.4.0"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-Flask = "^2.0.3"
 typer = "^0.4.0"
 requests = "^2.27.1"
 nvidia-ml-py = "^11.515.48"
+fastapi = "^0.79.0"
+python-multipart = "^0.0.5"
+uvicorn = {extras = ["standard"], version = "^0.18.2"}
 
 [tool.poetry.dev-dependencies]
 black = "^21.12b0"
@@ -24,7 +26,7 @@ types-requests = "^2.27.13"
 
 [tool.poetry.scripts]
 openforbc = "openforbc.cli.app:run"
-openforbcd = "openforbc.api.server:run"
+openforbcd = "openforbc.api.daemon:run"
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
