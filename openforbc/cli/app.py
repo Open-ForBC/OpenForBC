@@ -5,7 +5,7 @@ from logging import basicConfig
 from os import environ
 from typer import Typer
 
-from openforbc.cli.gpu import app as gpu_app
+from openforbc.cli.gpu.app import app as gpu_app
 
 
 basicConfig(

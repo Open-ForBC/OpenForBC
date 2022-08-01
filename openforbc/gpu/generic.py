@@ -90,10 +90,17 @@ class GPUPartitionType:
     tech: GPUPartitionTechnology
     memory: int
 
+    def __str__(self) -> str:
+        return f"{self.id}: ({self.tech}) {self.name} ({self.memory / 2**30}GiB)"
+
+    def into_generic(self) -> GPUPartitionType:
+        return GPUPartitionType(self.name, self.id, self.tech, self.memory)
+
 
 @dataclass
 class _GPUPartition:
     uuid: UUID
+    """UUID of the partition's mdev."""
     type: GPUPartitionType
 
 

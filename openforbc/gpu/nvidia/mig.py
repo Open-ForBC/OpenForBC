@@ -71,7 +71,7 @@ class GPUInstanceProfile:
 
     def __str__(self) -> str:
         """Pretty repr for GIP."""
-        return f"{self.slice_count}g.{round(self.memory_size / 1000)}gb" + (
+        return f"{self.id}: {self.slice_count}g.{round(self.memory_size / 1000)}gb" + (
             "+me" if self.slice_count < 7 and self.media_engine else ""
         )
 

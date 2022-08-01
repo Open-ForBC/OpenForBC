@@ -7,8 +7,12 @@ from openforbc.gpu.nvidia.gpu import NvidiaGPU
 from openforbc.gpu.nvidia.mig import MIGModeStatus
 
 
-def nvidia_gpu(uuid: UUID) -> NvidiaGPU:
-    if not isinstance((gpu := GPU.from_uuid(uuid)), NvidiaGPU):
+def get_gpu(uuid: UUID) -> GPU:
+    return GPU.from_uuid(uuid)
+
+
+def nvidia_gpu(gpu: GPU = Depends(get_gpu)) -> NvidiaGPU:
+    if not isinstance(gpu, NvidiaGPU):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "not an NVIDIA GPU")
 
     return gpu

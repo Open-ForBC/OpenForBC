@@ -34,4 +34,4 @@ class GPUInstanceModel:
         )
 
     def __str__(self) -> str:
-        return f"{self.id:2}: {self.profile} @ {self.parent}"
+        return f"{self.id:2}: gip=({self.profile}) @ {self.parent}"

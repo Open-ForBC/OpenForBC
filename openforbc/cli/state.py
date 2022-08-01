@@ -4,3 +4,7 @@
 from openforbc.api.client import APIClient
 
 state = {"api_client": APIClient.default()}
+
+
+def get_api_client():
+    return state["api_client"]

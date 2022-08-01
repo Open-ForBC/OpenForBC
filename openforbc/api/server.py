@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request  # noqa: TC002
 from fastapi.responses import JSONResponse
 
 from openforbc.api.endpoint.gpu import router as gpu_router
+from openforbc.gpu.model import GPUModel
 
 logger = getLogger(__name__)
 
@@ -19,14 +20,11 @@ def handle_exception(request: Request, exc: Exception):
 
 
 @app.get("/gpu", tags=["gpu"])
-def list_gpus() -> list[dict]:
+def list_gpus():
     """List all GPUs connected to the host."""
     from openforbc.gpu import GPU
 
-    return [
-        {"name": gpu.name, "uuid": gpu.uuid, "pciid": str(gpu.pciid)}
-        for gpu in GPU.get_gpus()
-    ]
+    return [GPUModel.from_raw(gpu) for gpu in GPU.get_gpus()]
 
 
 app.include_router(gpu_router, prefix="/gpu/{uuid}")
