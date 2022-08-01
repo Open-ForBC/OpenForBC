@@ -7,12 +7,17 @@ This module allows to partition a NVIDIA GPU using various supported technologie
 """
 
 from __future__ import annotations
+
+from dataclasses import dataclass
 from logging import getLogger
+from typing import TYPE_CHECKING
+from uuid import UUID
+
 from pynvml import (
     NVML_SUCCESS,
     NVML_GPU_INSTANCE_PROFILE_COUNT,
     NVMLError,
-    NVMLError_NotSupported,
+    NVMLError_NotSupported,  # type: ignore
     nvmlDeviceCreateGpuInstance,
     nvmlDeviceGetCount,
     nvmlDeviceGetCreatableVgpus,
@@ -28,14 +33,13 @@ from pynvml import (
     nvmlDeviceGetHostVgpuMode,
     nvmlDeviceGetPciInfo_v3,
     nvmlDeviceGetUUID,
+    nvmlDeviceGetGpuInstanceById,
     nvmlDeviceGetGpuInstanceRemainingCapacity,
     nvmlDeviceSetMigMode,
     nvmlVgpuTypeGetMaxInstances,
     nvmlInit,
     nvmlShutdown,
 )
-from typing import TYPE_CHECKING
-from uuid import UUID
 
 from openforbc.error import PermissionException
 from openforbc.gpu.generic import GPU
@@ -52,7 +56,7 @@ from openforbc.pci import PCIID
 from openforbc.sysfs.gpu import GPUSysFsHandle
 
 if TYPE_CHECKING:
-    from typing import Sequence
+    from typing import ClassVar, Sequence
 
     from openforbc.gpu.generic import GPUPartition, GPUPartitionType
     from openforbc.gpu.nvidia.nvml import NVMLDevice
@@ -66,6 +70,7 @@ class NvidiaGPUMIGDisabled(Exception):
     pass
 
 
+@dataclass
 class NvidiaGPU(GPU):
     """
     NvidiaGPU represents an NVIDIA GPU.
@@ -73,16 +78,18 @@ class NvidiaGPU(GPU):
     Allows to create/manage/delete both vGPUs and MIG instances.
     """
 
-    _ref_count = 0
+    _nvml_dev: NVMLDevice
+    supported_vgpu_types: list[VGPUType]
+    _ref_count: ClassVar[int] = 0
 
     @classmethod
     def from_nvml_handle_uuid(cls, dev: NVMLDevice, uuid: UUID) -> NvidiaGPU:
         """Create NvidiaGPU instance from NVML handle and its UUID."""
         return cls(
-            dev,
             nvmlDeviceGetName(dev),
             uuid,
             PCIID.from_int(nvmlDeviceGetPciInfo_v3(dev).pciDeviceId),
+            dev,
             [VGPUType.from_id(id) for id in nvmlDeviceGetSupportedVgpus(dev)],
         )
 
@@ -122,25 +129,12 @@ class NvidiaGPU(GPU):
                 for i in range(nvmlDeviceGetCount())
             ]
 
-    def __init__(
-        self,
-        nvml_dev: NVMLDevice,
-        name: str,
-        uuid: UUID,
-        pciid: PCIID,
-        supported_vgpu_types: list[VGPUType],
-    ) -> None:
-        """Create a NvidiaGPU instance."""
-        super().__init__(name, uuid, pciid)
-
-        # keep NVML initialized while at least an instance is present
+    def __post_init__(self) -> None:
+        """Manage refcount for NVML library."""
         if not NvidiaGPU._ref_count:
             logger.info("initializing NVML")
             nvmlInit()
         NvidiaGPU._ref_count += 1
-
-        self._nvml_dev = nvml_dev
-        self.supported_vgpu_types = supported_vgpu_types
 
     def __del__(self) -> None:
         """Handle NvidiaGPU delete."""
@@ -185,7 +179,7 @@ class NvidiaGPU(GPU):
                 instance.create_compute_instance(profile)
                 break
 
-        return handle
+        return instance
 
     def create_gpu_instance_maybe(self, vgpu_type: VGPUType) -> None:
         """Create a MIG GI if needed for specified vGPU type."""
@@ -353,6 +347,12 @@ class NvidiaGPU(GPU):
         """Get remaining capacity for the specified GI profile."""
         return nvmlDeviceGetGpuInstanceRemainingCapacity(self._nvml_dev, profile.id)
 
+    def get_gpu_instance_by_id(self, id: int) -> GPUInstance:
+        """Get a GPUInstance by its ID."""
+        return GPUInstance.from_nvml_handle_parent(
+            nvmlDeviceGetGpuInstanceById(self._nvml_dev, id), self
+        )
+
     def get_gpu_instances(self) -> list[GPUInstance]:
         """Get all GIs created on this GPU."""
         logger.info("getting GIs for %s", self)
@@ -390,6 +390,19 @@ class NvidiaGPU(GPU):
     def get_sysfs_handle(self) -> GPUSysFsHandle:
         """Get a GPUSysFsHandle for this GPU."""
         return GPUSysFsHandle.from_gpu(self)
+
+    def get_supported_gpu_instance_profiles(self) -> list[GPUInstanceProfile]:
+        """Get all supported MIG GPU instance profiles."""
+        logger.info("getting supported GIPs for %s", self)
+        profiles = []
+        for i in range(NVML_GPU_INSTANCE_PROFILE_COUNT):
+            logger.debug("checking support of GIP #%s by %s", i, self)
+            try:
+                profiles.append(GPUInstanceProfile.from_idx(i, self))
+            except NVMLError_NotSupported:
+                continue
+
+        return profiles
 
     def get_vgpu_mode(self) -> VGPUMode:
         """Get the vGPU mode of this GPU."""

@@ -18,7 +18,7 @@ from pynvml import (
     NVML_DEVICE_MIG_DISABLE,
     NVML_DEVICE_MIG_ENABLE,
     NVML_GPU_INSTANCE_PROFILE_COUNT,
-    NVMLError_NotSupported,
+    NVMLError_NotSupported,  # type: ignore
     nvmlComputeInstanceDestroy,
     nvmlComputeInstanceGetInfo,
     nvmlDeviceGetDeviceHandleFromMigDeviceHandle,
@@ -69,7 +69,7 @@ class GPUInstanceProfile:
     memory_size: int
     media_engine: bool
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         """Pretty repr for GIP."""
         return f"{self.slice_count}g.{round(self.memory_size / 1000)}gb" + (
             "+me" if self.slice_count < 7 and self.media_engine else ""
@@ -111,7 +111,7 @@ class GPUInstance:
     profile: GPUInstanceProfile
     parent: NvidiaGPU
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         """Pretty repr for GI."""
         return f"{self.profile} #{self.id} @({self.parent})"
 
@@ -131,8 +131,13 @@ class GPUInstance:
     @classmethod
     def from_nvml_handle(cls, dev: NVMLGpuInstance) -> GPUInstance:
         """Construct a GPUInstance from its NVMLHandle."""
+        from openforbc.gpu.nvidia.gpu import NvidiaGPU
+
         return cls.from_nvml_handle_parent(
-            dev, nvmlDeviceGetDeviceHandleFromMigDeviceHandle(dev)
+            dev,
+            NvidiaGPU.from_nvml_handle(
+                nvmlDeviceGetDeviceHandleFromMigDeviceHandle(dev)
+            ),
         )
 
     def create_compute_instance(

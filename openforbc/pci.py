@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 VENDORS = {0x10DE: "nvidia"}
 VENDORS_REV = {v: k for k, v in VENDORS.items()}
 DEVICES = {0x10DE: {0x20F1: "a100"}}
@@ -13,13 +15,10 @@ class PCIIDFormatException(Exception):
     pass
 
 
+@dataclass
 class PCIID:
     vendor: int
     device: int
-
-    def __init__(self, vendor: int, device: int) -> None:
-        self.vendor = vendor
-        self.device = device
 
     @classmethod
     def from_int(cls, pci_id: int) -> PCIID:

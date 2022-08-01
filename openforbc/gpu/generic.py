@@ -25,8 +25,8 @@ class _GPU:
 class GPU(_GPU, ABC):
     """Generic GPU."""
 
-    @staticmethod
-    def get_gpus() -> Sequence[GPU]:
+    @classmethod
+    def get_gpus(cls) -> Sequence[GPU]:
         """Get all GPUs of all vendors available to the system."""
         from openforbc.gpu.nvidia.gpu import NvidiaGPU
 
