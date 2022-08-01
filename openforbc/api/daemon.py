@@ -3,6 +3,8 @@ from os import environ as env
 from logging import basicConfig
 
 LOG_LEVEL = env.get("OPENFORBCD_LOGLEVEL") or env.get("LOGLEVEL")
+RELOAD = env.get("OPENFORBCD_RELOAD") or env.get("RELOAD")
+
 basicConfig(level=LOG_LEVEL, format="%(name)s: %(levelname)s: %(message)s")
 
 
@@ -18,5 +20,11 @@ def run() -> None:
         log_config["loggers"][name]["handlers"] = []
         log_config["loggers"][name]["propagate"] = True
         log_config["loggers"][name]["level"] = LOG_LEVEL or "INFO"
+    reload_enabled = bool(RELOAD)
 
-    uv_run(app, port=5000, log_config=log_config)
+    uv_run(
+        "openforbc.api.server:app" if reload_enabled else app,
+        port=5000,
+        log_config=log_config,
+        reload=reload_enabled,
+    )
