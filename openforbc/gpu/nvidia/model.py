@@ -3,7 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from openforbc.gpu.nvidia.gpu import NvidiaGPU
-from openforbc.gpu.nvidia.mig import GPUInstance, GPUInstanceProfile
+from openforbc.gpu.nvidia.mig import (
+    ComputeInstance,
+    ComputeInstanceProfile,
+    GPUInstance,
+    GPUInstanceProfile,
+)
 from openforbc.pci import PCIID
 
 
@@ -34,4 +39,20 @@ class GPUInstanceModel:
         )
 
     def __str__(self) -> str:
-        return f"{self.id:2}: gip=({self.profile}) @ {self.parent}"
+        return f"{self.id}: gip=({self.profile}) @ {self.parent}"
+
+
+@dataclass
+class ComputeInstanceModel:
+    id: int
+    profile: ComputeInstanceProfile
+    parent: GPUInstanceModel
+
+    @classmethod
+    def from_raw(cls, instance: ComputeInstance) -> ComputeInstanceModel:
+        return cls(
+            instance.id, instance.profile, GPUInstanceModel.from_raw(instance.parent)
+        )
+    
+    def __str__(self) -> str:
+        return f"{self.id}: {self.profile} @ GI#{self.parent.id}"

@@ -27,6 +27,7 @@ from pynvml import (
     nvmlGpuInstanceGetInfo,
     nvmlGpuInstanceCreateComputeInstance,
     nvmlGpuInstanceGetComputeInstanceProfileInfo,
+    nvmlGpuInstanceGetComputeInstanceRemainingCapacity,
     nvmlGpuInstanceGetComputeInstances,
 )
 
@@ -71,7 +72,7 @@ class GPUInstanceProfile:
 
     def __str__(self) -> str:
         """Pretty repr for GIP."""
-        return f"{self.id}: {self.slice_count}g.{round(self.memory_size / 1000)}gb" + (
+        return f"{self.slice_count}g.{round(self.memory_size / 1000)}gb" + (
             "+me" if self.slice_count < 7 and self.media_engine else ""
         )
 
@@ -168,6 +169,17 @@ class GPUInstance:
                 profiles.append(ComputeInstanceProfile.from_idx(i, self))
         return profiles
 
+    def get_compute_instance_remaining_capacity(
+        self, profile: ComputeInstanceProfile
+    ) -> int:
+        """Get remaining capacity for the specified compute instance profile."""
+        logger.info(
+            "getting remaining capacity for CIP %s on GI %s", profile.id, self.id
+        )
+        return nvmlGpuInstanceGetComputeInstanceRemainingCapacity(
+            self._nvml_dev, profile.id
+        )
+
     def get_compute_instances(self) -> list[ComputeInstance]:
         """Get children CIs."""
         from ctypes import byref, c_uint
@@ -208,13 +220,13 @@ class ComputeInstanceProfile:
     slice_count: int
     gpu_instance_profile: GPUInstanceProfile
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         """Pretty repr for ComputeInstanceProfile."""
         return (
             f"{self.slice_count}c."
             if self.slice_count != self.gpu_instance_profile.slice_count
             else ""
-        ) + repr(self.gpu_instance_profile)
+        ) + str(self.gpu_instance_profile)
 
     @classmethod
     def from_idx(cls, idx: int, gpu_instance: GPUInstance) -> ComputeInstanceProfile:

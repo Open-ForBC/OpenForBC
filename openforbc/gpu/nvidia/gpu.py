@@ -64,9 +64,17 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class NvidiaGPUMIGDisabled(Exception):
+class NvidiaGPUException(Exception):
+    pass
+
+
+class NvidiaGPUMIGDisabled(NvidiaGPUException):
     """Raised when trying to create a GI on a GPU with MIG mode disabled."""
 
+    pass
+
+
+class NvidiaGPUMIGCIProfileNotFound(NvidiaGPUException):
     pass
 
 
@@ -165,7 +173,9 @@ class NvidiaGPU(GPU):
         """Get created partitions on this GPU."""
         return self.get_created_mdevs()
 
-    def create_gpu_instance(self, profile_id: int) -> GPUInstance:
+    def create_gpu_instance(
+        self, profile_id: int, default_ci: bool = True
+    ) -> GPUInstance:
         """Create a MIG GPU instance on this GPU."""
         logger.info(
             "creating GI with profile #%s on %s", profile_id, self.get_pci_bus_id()
@@ -173,13 +183,18 @@ class NvidiaGPU(GPU):
         handle = nvmlDeviceCreateGpuInstance(self._nvml_dev, profile_id)
         logger.debug("got handle #%s for GI", str(handle))
         instance = GPUInstance.from_nvml_handle_parent(handle, self)
+        if not default_ci:
+            return instance
+
         for profile in instance.get_compute_instance_profiles():
             if profile.slice_count == instance.profile.slice_count:
                 logger.debug("default CIP is #%s", profile.id)
                 instance.create_compute_instance(profile)
-                break
+                return instance
 
-        return instance
+        raise NvidiaGPUMIGCIProfileNotFound(
+            f"Default CI profile not found for GIP #{profile_id}"
+        )
 
     def create_gpu_instance_maybe(self, vgpu_type: VGPUType) -> None:
         """Create a MIG GI if needed for specified vGPU type."""

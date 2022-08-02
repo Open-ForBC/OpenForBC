@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from openforbc.api.dependency import get_gpu
 from openforbc.api.endpoint.gpu.mig import router as mig_router
@@ -10,19 +10,19 @@ from openforbc.gpu.model import GPUPartitionModel
 router = APIRouter()
 
 
-@router.get("/types", tags=["gpu"])
+@router.get("/types", tags=["gpu", "partition"])
 def list_gpu_supported_types(gpu: GPU = Depends(get_gpu), creatable: bool = False):
     types = gpu.get_creatable_types() if creatable else gpu.get_supported_types()
     return [type.into_generic() for type in types]
 
 
-@router.get("/partition", tags=["gpu"])
+@router.get("/partition", tags=["gpu", "partition"])
 def list_gpu_partitions(gpu: GPU = Depends(get_gpu)):
     return [GPUPartitionModel.from_raw(partition) for partition in gpu.get_partitions()]
 
 
 @router.post("/partition", tags=["gpu", "partition"])
-def create_gpu_partition(gpu: GPU = Depends(get_gpu), type_id: int = Form()):
+def create_gpu_partition(type_id: int, gpu: GPU = Depends(get_gpu)):
     if (
         part_type := next(
             (x for x in gpu.get_supported_types() if x.id == type_id), None
