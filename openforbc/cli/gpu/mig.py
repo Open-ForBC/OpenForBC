@@ -1,4 +1,6 @@
-from typing import Optional
+# Copyright (c) 2021-2022 Istituto Nazionale di Fisica Nucleare
+# SPDX-License-Identifier: MIT
+from typing import Optional  # noqa: TC002
 
 from typer import Context, Option, echo, Typer  # noqa: TC002
 

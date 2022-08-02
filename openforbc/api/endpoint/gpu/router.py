@@ -1,3 +1,5 @@
+# Copyright (c) 2021-2022 Istituto Nazionale di Fisica Nucleare
+# SPDX-License-Identifier: MIT
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status

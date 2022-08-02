@@ -1,4 +1,7 @@
+# Copyright (c) 2021-2022 Istituto Nazionale di Fisica Nucleare
+# SPDX-License-Identifier: MIT
 """The OpenForBC daemon (API) server."""
+
 from os import environ as env
 from logging import basicConfig
 

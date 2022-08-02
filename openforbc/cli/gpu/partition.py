@@ -1,8 +1,10 @@
+# Copyright (c) 2021-2022 Istituto Nazionale di Fisica Nucleare
+# SPDX-License-Identifier: MIT
 from __future__ import annotations
 
 from uuid import UUID
 
-from typer import Context, Exit, echo, Option, Typer
+from typer import Context, Exit, echo, Option, Typer  # noqa: TC002
 
 from openforbc.cli.gpu.state import get_gpu_uuid
 from openforbc.cli.state import state as global_state

@@ -1,6 +1,5 @@
 # Copyright (c) 2021-2022 Istituto Nazionale di Fisica Nucleare
 # SPDX-License-Identifier: MIT
-
 from logging import basicConfig
 from os import environ
 from typer import Typer

@@ -1,3 +1,5 @@
+# Copyright (c) 2021-2022 Istituto Nazionale di Fisica Nucleare
+# SPDX-License-Identifier: MIT
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -53,6 +55,6 @@ class ComputeInstanceModel:
         return cls(
             instance.id, instance.profile, GPUInstanceModel.from_raw(instance.parent)
         )
-    
+
     def __str__(self) -> str:
         return f"{self.id}: {self.profile} @ GI#{self.parent.id}"
