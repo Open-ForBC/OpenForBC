@@ -9,7 +9,7 @@ from typer import Context, Exit, echo, Option, Typer  # noqa: TC002
 
 from openforbc.cli.gpu.state import get_gpu_uuid
 from openforbc.cli.state import state as global_state
-from openforbc.gpu.generic import GPUPartitionTechnology  # noqa: TC001
+from openforbc.gpu.generic import GPUvPartitionTechnology  # noqa: TC001
 
 
 vpartition = Typer(help="Manage GPU partitions for VMs")
@@ -25,7 +25,7 @@ def part_callback(ctx: Context) -> None:
 def list_supported_types(
     creatable: bool = Option(False, "--creatable", "-c"),
     id_only: bool = Option(False, "--id-only", "-q"),
-    technology: Optional[GPUPartitionTechnology] = Option(None, "--tech", "-t"),
+    technology: Optional[GPUvPartitionTechnology] = Option(None, "--tech", "-t"),
 ) -> None:
     """List supported partition types."""
 

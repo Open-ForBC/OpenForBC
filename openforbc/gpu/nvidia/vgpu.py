@@ -21,7 +21,7 @@ from pynvml import (
     NVML_HOST_VGPU_MODE_SRIOV,
 )
 
-from openforbc.gpu.generic import GPUPartition, GPUPartitionType, GPUPartitionTechnology
+from openforbc.gpu.generic import GPUvPartition, GPUvPartitionType, GPUvPartitionTechnology
 from openforbc.gpu.nvidia.mig import GPUInstanceProfile
 from openforbc.gpu.nvidia.nvml import nvml_context
 from openforbc.sysfs.mdev import MdevSysFsHandle
@@ -55,7 +55,7 @@ class VGPUTypeException(Exception):
 
 
 @dataclass
-class VGPUType(GPUPartitionType):
+class VGPUType(GPUvPartitionType):
     """A NVIDIA vGPU type."""
 
     vgpu_class: str
@@ -70,9 +70,9 @@ class VGPUType(GPUPartitionType):
         super().__init__(
             name,
             id,
-            GPUPartitionTechnology.NVIDIA_VGPU_MIG
+            GPUvPartitionTechnology.NVIDIA_VGPU_MIG
             if is_mig
-            else GPUPartitionTechnology.NVIDIA_VGPU_TIMESHARED,
+            else GPUvPartitionTechnology.NVIDIA_VGPU_TIMESHARED,
             memory,
         )
 
@@ -135,7 +135,7 @@ class VGPUInstance:
 
 
 @dataclass
-class VGPUMdev(GPUPartition):
+class VGPUMdev(GPUvPartition):
     """
     A VGPUMdev represents a VFIO Mediated device with a vGPU type.
 

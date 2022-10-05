@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from openforbc.gpu.generic import GPU, GPUPartition, GPUPartitionType
+from openforbc.gpu.generic import GPU, GPUvPartition, GPUvPartitionType
 from openforbc.pci import PCIID
 
 
@@ -22,10 +22,10 @@ class GPUModel:
 @dataclass
 class GPUPartitionModel:
     uuid: str
-    type: GPUPartitionType
+    type: GPUvPartitionType
 
     @classmethod
-    def from_raw(cls, partition: GPUPartition) -> GPUPartitionModel:
+    def from_raw(cls, partition: GPUvPartition) -> GPUPartitionModel:
         return cls(str(partition.uuid), partition.type.into_generic())
 
     def __str__(self) -> str:

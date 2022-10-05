@@ -10,7 +10,7 @@ from requests import JSONDecodeError, Session
 from typer import Exit
 
 from openforbc.api.url import DEFAULT_BASE_URL, GPU_ENDPOINT_PATH
-from openforbc.gpu.generic import GPUPartitionType
+from openforbc.gpu.generic import GPUvPartitionType
 from openforbc.gpu.model import GPUModel, GPUPartitionModel
 from openforbc.gpu.nvidia.mig import (
     ComputeInstanceProfile,
@@ -78,13 +78,13 @@ class APIClient:
 
     def get_supported_types(
         self, gpu_uuid: UUID, creatable: bool = False
-    ) -> list[GPUPartitionType]:
+    ) -> list[GPUvPartitionType]:
         return self.send_gpu_request(
             gpu_uuid,
             "GET",
             "/types",
             {"creatable": int(creatable)},
-            type=List[GPUPartitionType],
+            type=List[GPUvPartitionType],
         )
 
     def get_partitions(self, gpu_uuid: UUID) -> list[GPUPartitionModel]:

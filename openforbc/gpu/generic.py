@@ -41,29 +41,29 @@ class GPU(_GPU, ABC):
         return NvidiaGPU.from_uuid(uuid)
 
     @abstractmethod
-    def get_supported_types(self) -> Sequence[GPUPartitionType]:
+    def get_supported_types(self) -> Sequence[GPUvPartitionType]:
         """Get all the partition types supported by this GPU."""
         ...
 
     @abstractmethod
-    def get_creatable_types(self) -> Sequence[GPUPartitionType]:
+    def get_creatable_types(self) -> Sequence[GPUvPartitionType]:
         """Get all the partition types which can be actually created at this time."""
         ...
 
     @abstractmethod
-    def get_partitions(self) -> Sequence[GPUPartition]:
+    def get_partitions(self) -> Sequence[GPUvPartition]:
         """Get all created partitons on this GPU."""
         ...
 
     @abstractmethod
-    def create_partition(self, type: GPUPartitionType) -> GPUPartition:
+    def create_partition(self, type: GPUvPartitionType) -> GPUvPartition:
         """Create a partition on this GPU with the specified type."""
         ...
 
 
-class GPUPartitionTechnology(str, Enum):
+class GPUvPartitionTechnology(str, Enum):
     """
-    A GPU partitioning technology.
+    A GPU partitioning technology for VMs.
 
     Different GPU vendors have their technologies.
 
@@ -77,7 +77,7 @@ class GPUPartitionTechnology(str, Enum):
 
 
 @dataclass
-class GPUPartitionType:
+class GPUvPartitionType:
     """
     A GPU partition type.
 
@@ -87,24 +87,24 @@ class GPUPartitionType:
 
     name: str
     id: int
-    tech: GPUPartitionTechnology
+    tech: GPUvPartitionTechnology
     memory: int
 
     def __str__(self) -> str:
         return f"{self.id}: ({self.tech}) {self.name} ({self.memory / 2**30}GiB)"
 
-    def into_generic(self) -> GPUPartitionType:
-        return GPUPartitionType(self.name, self.id, self.tech, self.memory)
+    def into_generic(self) -> GPUvPartitionType:
+        return GPUvPartitionType(self.name, self.id, self.tech, self.memory)
 
 
 @dataclass
-class _GPUPartition:
+class _GPUvPartition:
     uuid: UUID
     """UUID of the partition's mdev."""
-    type: GPUPartitionType
+    type: GPUvPartitionType
 
 
-class GPUPartition(_GPUPartition, ABC):
+class GPUvPartition(_GPUvPartition, ABC):
     """
     Repesent a generic (mdev) GPU partition.
 
