@@ -2,24 +2,45 @@
 # SPDX-License-Identifier: MIT
 from __future__ import annotations
 
+from typing import Optional  # noqa: TC002
 from uuid import UUID
 
 from typer import Context, Exit, echo, Option, Typer  # noqa: TC002
 
 from openforbc.cli.gpu.state import get_gpu_uuid
 from openforbc.cli.state import state as global_state
+from openforbc.gpu.generic import GPUPartitionTechnology  # noqa: TC001
 
 
-partition = Typer(help="List and create GPU partitions")
+vpartition = Typer(help="Manage GPU partitions for VMs")
 
 
-@partition.callback(invoke_without_command=True)
+@vpartition.callback(invoke_without_command=True)
 def part_callback(ctx: Context) -> None:
     if ctx.invoked_subcommand is None:
         ctx.invoke(list_partitions, uuid_only=False)
 
 
-@partition.command("list")
+@vpartition.command("types")
+def list_supported_types(
+    creatable: bool = Option(False, "--creatable", "-c"),
+    id_only: bool = Option(False, "--id-only", "-q"),
+    technology: Optional[GPUPartitionTechnology] = Option(None, "--tech", "-t"),
+) -> None:
+    """List supported partition types."""
+
+    gpu_uuid = get_gpu_uuid()
+
+    client = global_state["api_client"]
+    types = client.get_supported_types(gpu_uuid, creatable)
+
+    for type in (
+        filter(lambda type: type.tech == technology, types) if technology else types
+    ):
+        echo(type.id if id_only else type)
+
+
+@vpartition.command("list")
 def list_partitions(uuid_only: bool = Option(False, "--uuid-only", "-q")) -> None:
     """List GPU partitions."""
     client = global_state["api_client"]
@@ -31,7 +52,7 @@ def list_partitions(uuid_only: bool = Option(False, "--uuid-only", "-q")) -> Non
         echo(partition.uuid if uuid_only else partition)
 
 
-@partition.command("create")
+@vpartition.command("create")
 def create_partition(
     type_id: int, uuid_only: bool = Option(False, "--uuid-only", "-q")
 ) -> None:
@@ -40,7 +61,7 @@ def create_partition(
     echo(partition.uuid if uuid_only else partition)
 
 
-@partition.command("get")
+@vpartition.command("get")
 def get_partition_definition(partition_uuid: UUID):
     """Get libvirt XML definition for selected partition."""
     partitions = global_state["api_client"].get_partitions(get_gpu_uuid())
@@ -63,7 +84,7 @@ def get_partition_definition(partition_uuid: UUID):
     )
 
 
-@partition.command("destroy")
-def destroy_partition(partition_uuid: UUID):
+@vpartition.command("destroy")
+def destroy_partition(partition_uuid: UUID) -> None:
     """Destroy the selected partition."""
     return global_state["api_client"].destroy_partition(get_gpu_uuid(), partition_uuid)
