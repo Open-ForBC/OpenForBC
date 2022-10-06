@@ -21,7 +21,11 @@ from pynvml import (
     NVML_HOST_VGPU_MODE_SRIOV,
 )
 
-from openforbc.gpu.generic import GPUvPartition, GPUvPartitionType, GPUvPartitionTechnology
+from openforbc.gpu.generic import (
+    GPUvPartition,
+    GPUvPartitionType,
+    GPUvPartitionTechnology,
+)
 from openforbc.gpu.nvidia.mig import GPUInstanceProfile
 from openforbc.gpu.nvidia.nvml import nvml_context
 from openforbc.sysfs.mdev import MdevSysFsHandle

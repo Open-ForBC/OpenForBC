@@ -32,7 +32,7 @@ def list_supported_types(
     gpu_uuid = get_gpu_uuid()
 
     client = global_state["api_client"]
-    types = client.get_supported_types(gpu_uuid, creatable)
+    types = client.get_supported_vpart_types(gpu_uuid, creatable)
 
     for type in (
         filter(lambda type: type.tech == technology, types) if technology else types
@@ -46,7 +46,7 @@ def list_partitions(uuid_only: bool = Option(False, "--uuid-only", "-q")) -> Non
     client = global_state["api_client"]
     gpu_uuid = get_gpu_uuid()
 
-    partitions = client.get_partitions(gpu_uuid)
+    partitions = client.get_vpartitions(gpu_uuid)
 
     for partition in partitions:
         echo(partition.uuid if uuid_only else partition)
@@ -57,14 +57,14 @@ def create_partition(
     type_id: int, uuid_only: bool = Option(False, "--uuid-only", "-q")
 ) -> None:
     """Create a GPU partition."""
-    partition = global_state["api_client"].create_partition(get_gpu_uuid(), type_id)
+    partition = global_state["api_client"].create_vpartition(get_gpu_uuid(), type_id)
     echo(partition.uuid if uuid_only else partition)
 
 
 @vpartition.command("get")
 def get_partition_definition(partition_uuid: UUID):
     """Get libvirt XML definition for selected partition."""
-    partitions = global_state["api_client"].get_partitions(get_gpu_uuid())
+    partitions = global_state["api_client"].get_vpartitions(get_gpu_uuid())
 
     if not [True for x in partitions if UUID(x.uuid) == partition_uuid]:
         echo(f'ERROR: no such partition "{partition_uuid}".', err=True)
@@ -87,4 +87,4 @@ def get_partition_definition(partition_uuid: UUID):
 @vpartition.command("destroy")
 def destroy_partition(partition_uuid: UUID) -> None:
     """Destroy the selected partition."""
-    return global_state["api_client"].destroy_partition(get_gpu_uuid(), partition_uuid)
+    return global_state["api_client"].destroy_vpartition(get_gpu_uuid(), partition_uuid)

@@ -31,6 +31,7 @@ from pynvml import (
     nvmlGpuInstanceGetComputeInstances,
 )
 
+from openforbc.gpu.generic import GPUhPartitionType, GPUhPartitionTechnology
 from openforbc.gpu.nvidia.nvml import NVMLComputeInstance
 
 
@@ -213,20 +214,11 @@ class GPUInstance:
 
 
 @dataclass
-class ComputeInstanceProfile:
+class ComputeInstanceProfile(GPUhPartitionType):
     """A MIG compute instance profile."""
 
-    id: int
     slice_count: int
     gpu_instance_profile: GPUInstanceProfile
-
-    def __str__(self) -> str:
-        """Pretty repr for ComputeInstanceProfile."""
-        return (
-            f"{self.slice_count}c."
-            if self.slice_count != self.gpu_instance_profile.slice_count
-            else ""
-        ) + str(self.gpu_instance_profile)
 
     @classmethod
     def from_idx(cls, idx: int, gpu_instance: GPUInstance) -> ComputeInstanceProfile:
@@ -234,7 +226,14 @@ class ComputeInstanceProfile:
         info = nvmlGpuInstanceGetComputeInstanceProfileInfo(
             gpu_instance._nvml_dev, idx, NVML_COMPUTE_INSTANCE_ENGINE_PROFILE_SHARED
         )
-        return cls(info.id, info.sliceCount, gpu_instance.profile)
+        return cls(
+            info.name.decode(),
+            info.id,
+            GPUhPartitionTechnology.NVIDIA_MIG,
+            gpu_instance.profile.memory_size,
+            info.sliceCount,
+            gpu_instance.profile,
+        )
 
     @classmethod
     def from_id(cls, id: int, gpu_instance: GPUInstance) -> ComputeInstanceProfile:
@@ -249,7 +248,14 @@ class ComputeInstanceProfile:
             except NVMLError_NotSupported:
                 continue
             if info.id == id:
-                return cls(info.id, info.sliceCount, gpu_instance.profile)
+                return cls(
+                    info.name.decode(),
+                    info.id,
+                    GPUhPartitionTechnology.NVIDIA_MIG,
+                    gpu_instance.profile.memory_size,
+                    info.sliceCount,
+                    gpu_instance.profile,
+                )
         raise NvidiaMIGCIPNotFound
 
 

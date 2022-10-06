@@ -57,4 +57,4 @@ class ComputeInstanceModel:
         )
 
     def __str__(self) -> str:
-        return f"{self.id}: {self.profile} @ GI#{self.parent.id}"
+        return f"{self.id}: type=({self.profile.name}) tech={self.profile.tech}"

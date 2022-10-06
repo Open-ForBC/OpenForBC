@@ -11,7 +11,7 @@ from typer import Exit
 
 from openforbc.api.url import DEFAULT_BASE_URL, GPU_ENDPOINT_PATH
 from openforbc.gpu.generic import GPUvPartitionType
-from openforbc.gpu.model import GPUModel, GPUPartitionModel
+from openforbc.gpu.model import GPUModel, GPUvPartitionModel
 from openforbc.gpu.nvidia.mig import (
     ComputeInstanceProfile,
     GPUInstanceProfile,
@@ -76,30 +76,34 @@ class APIClient:
             List[GPUModel], self.send_request("GET", f"{self.base_url}/gpu").text
         )
 
-    def get_supported_types(
+    def get_supported_vpart_types(
         self, gpu_uuid: UUID, creatable: bool = False
     ) -> list[GPUvPartitionType]:
         return self.send_gpu_request(
             gpu_uuid,
             "GET",
-            "/types",
+            "/vpart/types",
             {"creatable": int(creatable)},
             type=List[GPUvPartitionType],
         )
 
-    def get_partitions(self, gpu_uuid: UUID) -> list[GPUPartitionModel]:
+    def get_vpartitions(self, gpu_uuid: UUID) -> list[GPUvPartitionModel]:
         return self.send_gpu_request(
-            gpu_uuid, "GET", "/partition", type=List[GPUPartitionModel]
+            gpu_uuid, "GET", "/vpart", type=List[GPUvPartitionModel]
         )
 
-    def create_partition(self, gpu_uuid: UUID, type_id: int) -> Any:
+    def create_vpartition(self, gpu_uuid: UUID, type_id: int) -> Any:
         return self.send_gpu_request(
-            gpu_uuid, "POST", "/partition", {"type_id": type_id}, type=GPUPartitionModel
+            gpu_uuid,
+            "POST",
+            "/vpart",
+            {"type_id": type_id},
+            type=GPUvPartitionModel,
         )
 
-    def destroy_partition(self, gpu_uuid: UUID, partition_uuid: UUID) -> None:
+    def destroy_vpartition(self, gpu_uuid: UUID, partition_uuid: UUID) -> None:
         json = self.send_gpu_request(
-            gpu_uuid, "DELETE", f"/partition/{partition_uuid}", json=True
+            gpu_uuid, "DELETE", f"/vpart/{partition_uuid}", json=True
         )
         assert "ok" in json
         assert json["ok"]
@@ -279,6 +283,7 @@ class APIClient:
         if json:
             return r.json()
         if type is not None:
+            logger.debug("parsing as %s", type)
             return parse_raw_as(type, r.text)
 
         return r

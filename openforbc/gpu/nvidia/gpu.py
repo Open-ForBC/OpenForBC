@@ -156,20 +156,20 @@ class NvidiaGPU(GPU):
         """Pretty repr NvidiaGPU."""
         return f"{self.name} @{self.get_pci_bus_id()}"
 
-    def get_supported_types(self) -> Sequence[GPUvPartitionType]:
+    def get_supported_vpart_types(self) -> Sequence[GPUvPartitionType]:
         """Get GPU supported partition types."""
         return self.supported_vgpu_types
 
-    def get_creatable_types(self) -> Sequence[GPUvPartitionType]:
+    def get_creatable_vpart_types(self) -> Sequence[GPUvPartitionType]:
         """Get GPU creatable partition types."""
         return self.get_creatable_vgpus()
 
-    def create_partition(self, type: GPUvPartitionType) -> GPUvPartition:
+    def create_vpartition(self, type: GPUvPartitionType) -> GPUvPartition:
         """Create a partition with specified type on this GPU."""
         assert isinstance(type, VGPUType)
         return self.create_vgpu(type)
 
-    def get_partitions(self) -> Sequence[GPUvPartition]:
+    def get_vpartitions(self) -> Sequence[GPUvPartition]:
         """Get created partitions on this GPU."""
         return self.get_created_mdevs()
 
