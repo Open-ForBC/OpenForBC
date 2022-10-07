@@ -60,6 +60,26 @@ class GPU(_GPU, ABC):
         """Create a VM partition on this GPU with the specified type."""
         ...
 
+    @abstractmethod
+    def get_supported_hpart_types(self) -> Sequence[GPUhPartitionType]:
+        """Get all the host partition types supported by this GPU."""
+        ...
+
+    @abstractmethod
+    def get_creatable_hpart_types(self) -> Sequence[GPUhPartitionType]:
+        """Get all the host partition types which are available to create."""
+        ...
+
+    @abstractmethod
+    def get_hpartitions(self) -> Sequence[GPUhPartition]:
+        """Get all created host partitons on this GPU."""
+        ...
+
+    @abstractmethod
+    def create_hpartition(self, type: GPUhPartitionType) -> GPUhPartition:
+        """Create a host partition on this GPU with the specified type."""
+        ...
+
 
 class GPUvPartitionTechnology(str, Enum):
     """
@@ -97,6 +117,9 @@ class GPUPartitionType:
     tech: GPUPartitionTechnology
     memory: int
 
+    def __str__(self) -> str:
+        return f"{self.id}: ({self.tech}) {self.name} ({self.memory / 2**30}GiB)"
+
 
 @dataclass
 class _GPUPartition:
@@ -120,9 +143,6 @@ class GPUvPartitionType(GPUPartitionType):
     """
 
     tech: GPUvPartitionTechnology
-
-    def __str__(self) -> str:
-        return f"{self.id}: ({self.tech}) {self.name} ({self.memory / 2**30}GiB)"
 
     # def into_generic(self) -> GPUvPartitionType:
     #     return GPUvPartitionType(self.name, self.id, self.tech, self.memory)

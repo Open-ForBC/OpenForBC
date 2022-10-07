@@ -17,6 +17,7 @@ from pynvml import (
     NVML_SUCCESS,
     NVML_GPU_INSTANCE_PROFILE_COUNT,
     NVMLError,
+    NVMLError_NotFound,  # type: ignore
     NVMLError_NotSupported,  # type: ignore
     nvmlDeviceCreateGpuInstance,
     nvmlDeviceGetCount,
@@ -31,6 +32,8 @@ from pynvml import (
     nvmlDeviceGetHandleByPciBusId,
     nvmlDeviceGetHandleByUUID,
     nvmlDeviceGetHostVgpuMode,
+    nvmlDeviceGetMaxMigDeviceCount,
+    nvmlDeviceGetMigDeviceHandleByIndex,
     nvmlDeviceGetPciInfo_v3,
     nvmlDeviceGetUUID,
     nvmlDeviceGetGpuInstanceById,
@@ -42,7 +45,7 @@ from pynvml import (
 )
 
 from openforbc.error import PermissionException
-from openforbc.gpu.generic import GPU
+from openforbc.gpu.generic import GPU, GPUhPartition, GPUhPartitionType
 from openforbc.gpu.nvidia.nvml import NVMLGpuInstance, nvml_context
 from openforbc.gpu.nvidia.vgpu import (
     VGPUCreateException,
@@ -51,7 +54,12 @@ from openforbc.gpu.nvidia.vgpu import (
     VGPUMode,
     VGPUType,
 )
-from openforbc.gpu.nvidia.mig import GPUInstance, GPUInstanceProfile, MIGModeStatus
+from openforbc.gpu.nvidia.mig import (
+    GPUInstance,
+    GPUInstanceProfile,
+    MIGDevice,
+    MIGModeStatus,
+)
 from openforbc.pci import PCIID
 from openforbc.sysfs.gpu import GPUSysFsHandle
 
@@ -172,6 +180,23 @@ class NvidiaGPU(GPU):
     def get_vpartitions(self) -> Sequence[GPUvPartition]:
         """Get created partitions on this GPU."""
         return self.get_created_mdevs()
+
+    def get_supported_hpart_types(self) -> Sequence[GPUhPartitionType]:
+        return self.get_supported_gpu_instance_profiles()
+
+    def get_creatable_hpart_types(self) -> Sequence[GPUhPartitionType]:
+        return [
+            profile
+            for profile in self.get_supported_gpu_instance_profiles()
+            if self.get_gpu_instance_remaining_capacity(profile)
+        ]
+
+    def get_hpartitions(self) -> Sequence[GPUhPartition]:
+        return self.get_mig_devices()
+
+    def create_hpartition(self, type: GPUhPartitionType) -> GPUhPartition:
+        gi = self.create_gpu_instance(type.id)
+        return next(x for x in self.get_mig_devices() if x.ci.parent.id == gi.id)
 
     def create_gpu_instance(
         self, profile_id: int, default_ci: bool = True
@@ -397,6 +422,22 @@ class NvidiaGPU(GPU):
                 )
 
         return instances
+
+    def get_mig_devices(self) -> list[MIGDevice]:
+        logger.info("getting MIG devices for %s", self)
+        devs = []
+        for i in range(nvmlDeviceGetMaxMigDeviceCount(self._nvml_dev)):
+            logger.debug("trying index %s", i)
+            try:
+                devs.append(
+                    MIGDevice.from_handle(
+                        nvmlDeviceGetMigDeviceHandleByIndex(self._nvml_dev, i), self
+                    )
+                )
+            except NVMLError_NotFound:
+                continue
+
+        return devs
 
     def get_pci_bus_id(self) -> str:
         """Get this GPU's PCI bus id."""

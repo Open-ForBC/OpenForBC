@@ -10,8 +10,8 @@ from requests import JSONDecodeError, Session
 from typer import Exit
 
 from openforbc.api.url import DEFAULT_BASE_URL, GPU_ENDPOINT_PATH
-from openforbc.gpu.generic import GPUvPartitionType
-from openforbc.gpu.model import GPUModel, GPUvPartitionModel
+from openforbc.gpu.generic import GPUhPartitionType, GPUvPartitionType
+from openforbc.gpu.model import GPUModel, GPUhPartitionModel, GPUvPartitionModel
 from openforbc.gpu.nvidia.mig import (
     ComputeInstanceProfile,
     GPUInstanceProfile,
@@ -104,6 +104,38 @@ class APIClient:
     def destroy_vpartition(self, gpu_uuid: UUID, partition_uuid: UUID) -> None:
         json = self.send_gpu_request(
             gpu_uuid, "DELETE", f"/vpart/{partition_uuid}", json=True
+        )
+        assert "ok" in json
+        assert json["ok"]
+
+    def get_supported_hpart_types(
+        self, gpu_uuid: UUID, creatable: bool = False
+    ) -> list[GPUhPartitionType]:
+        return self.send_gpu_request(
+            gpu_uuid,
+            "GET",
+            "/hpart/types",
+            {"creatable": int(creatable)},
+            type=List[GPUhPartitionType],
+        )
+
+    def get_hpartitions(self, gpu_uuid: UUID) -> list[GPUhPartitionModel]:
+        return self.send_gpu_request(
+            gpu_uuid, "GET", "/hpart", type=List[GPUhPartitionModel]
+        )
+
+    def create_hpartition(self, gpu_uuid: UUID, type_id: int) -> Any:
+        return self.send_gpu_request(
+            gpu_uuid,
+            "POST",
+            "/hpart",
+            {"type_id": type_id},
+            type=GPUhPartitionModel,
+        )
+
+    def destroy_hpartition(self, gpu_uuid: UUID, partition_uuid: UUID) -> None:
+        json = self.send_gpu_request(
+            gpu_uuid, "DELETE", f"/hpart/{partition_uuid}", json=True
         )
         assert "ok" in json
         assert json["ok"]

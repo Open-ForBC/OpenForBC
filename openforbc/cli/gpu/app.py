@@ -10,6 +10,7 @@ from typer import Context, echo, Exit, Option, Typer  # noqa: TC002
 
 from openforbc.cli.state import state as global_state
 from openforbc.cli.gpu.mig import mig
+from openforbc.cli.gpu.hpartition import hpartition
 from openforbc.cli.gpu.vpartition import vpartition
 from openforbc.cli.gpu.state import state
 
@@ -21,8 +22,10 @@ logger = getLogger(__name__)
 
 app = Typer(help="Operate on GPUs")
 app.add_typer(mig, name="mig")
-app.add_typer(vpartition, name="vmpartition")
-app.add_typer(vpartition, name="vpart", help="Shortcut for *vmpartition*")
+app.add_typer(hpartition, name="host-partition")
+app.add_typer(hpartition, name="hpart", help="Shortcut for *host-partition")
+app.add_typer(vpartition, name="vm-partition")
+app.add_typer(vpartition, name="vpart", help="Shortcut for *vm-partition*")
 
 
 @app.callback(invoke_without_command=True)
