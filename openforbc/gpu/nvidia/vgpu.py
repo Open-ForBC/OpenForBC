@@ -77,7 +77,7 @@ class VGPUType(GPUvPartitionType):
             GPUvPartitionTechnology.NVIDIA_VGPU_MIG
             if is_mig
             else GPUvPartitionTechnology.NVIDIA_VGPU_TIMESHARED,
-            memory,
+            int(memory / 2**20),
         )
 
         self.id = id

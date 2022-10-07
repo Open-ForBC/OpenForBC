@@ -118,7 +118,7 @@ class GPUPartitionType:
     memory: int
 
     def __str__(self) -> str:
-        return f"{self.id}: ({self.tech}) {self.name} ({self.memory / 2**30}GiB)"
+        return f"{self.id}: ({self.tech}) {self.name} ({self.memory / 2**10}GiB)"
 
 
 @dataclass
