@@ -27,8 +27,7 @@ def list_supported_types(
     id_only: bool = Option(False, "--id-only", "-q"),
     technology: Optional[GPUvPartitionTechnology] = Option(None, "--tech", "-t"),
 ) -> None:
-    """List supported partition types."""
-
+    """List supported VM partition types."""
     gpu_uuid = get_gpu_uuid()
 
     client = global_state["api_client"]
@@ -42,7 +41,7 @@ def list_supported_types(
 
 @vpartition.command("list")
 def list_partitions(uuid_only: bool = Option(False, "--uuid-only", "-q")) -> None:
-    """List GPU partitions."""
+    """List GPU VM partitions."""
     client = global_state["api_client"]
     gpu_uuid = get_gpu_uuid()
 
@@ -56,14 +55,14 @@ def list_partitions(uuid_only: bool = Option(False, "--uuid-only", "-q")) -> Non
 def create_partition(
     type_id: int, uuid_only: bool = Option(False, "--uuid-only", "-q")
 ) -> None:
-    """Create a GPU partition."""
+    """Create a GPU VM partition."""
     partition = global_state["api_client"].create_vpartition(get_gpu_uuid(), type_id)
     echo(partition.uuid if uuid_only else partition)
 
 
 @vpartition.command("get")
 def get_partition_definition(partition_uuid: UUID):
-    """Get libvirt XML definition for selected partition."""
+    """Get libvirt XML definition for selected VM partition."""
     partitions = global_state["api_client"].get_vpartitions(get_gpu_uuid())
 
     if not [True for x in partitions if UUID(x.uuid) == partition_uuid]:
@@ -86,5 +85,5 @@ def get_partition_definition(partition_uuid: UUID):
 
 @vpartition.command("destroy")
 def destroy_partition(partition_uuid: UUID) -> None:
-    """Destroy the selected partition."""
+    """Destroy the specified VM partition."""
     return global_state["api_client"].destroy_vpartition(get_gpu_uuid(), partition_uuid)

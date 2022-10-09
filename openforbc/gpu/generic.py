@@ -23,7 +23,7 @@ class _GPU:
 
 
 class GPU(_GPU, ABC):
-    """Generic GPU."""
+    """A generic GPU."""
 
     @classmethod
     def get_gpus(cls) -> Sequence[GPU]:
@@ -112,13 +112,20 @@ GPUPartitionTechnology = Union[GPUvPartitionTechnology, GPUhPartitionTechnology]
 
 @dataclass
 class GPUPartitionType:
+    """
+    A GPU partition type.
+
+    A partition type has a specific amount of FB memory dedicated and is provided by the
+    GPU using a specific technology.
+    """
+
     name: str
     id: int
     tech: GPUPartitionTechnology
     memory: int
 
     def __str__(self) -> str:
-        return f"{self.id}: ({self.tech}) {self.name} ({self.memory / 2**10}GiB)"
+        return f"{self.id}: ({self.tech}) {self.name} ({self.memory}MiB)"
 
 
 @dataclass
@@ -128,6 +135,14 @@ class _GPUPartition:
 
 
 class GPUPartition(_GPUPartition, ABC):
+    """
+    A generic GPU partition.
+
+    There can be two (sub)types of partitions:
+    - GPUvPartition: GPU partitions to be used in VMs
+    - GPUhPartition: GPU partitions which can be used by the host itself
+    """
+
     @abstractmethod
     def destroy(self) -> None:
         ...
@@ -136,21 +151,17 @@ class GPUPartition(_GPUPartition, ABC):
 @dataclass
 class GPUvPartitionType(GPUPartitionType):
     """
-    A GPU partition type.
+    GPUPartitionType specific for VM partitions.
 
-    A partition type has a specific amount of FB memory dedicated and is provided by the
-    GPU using a specific technology.
+    The `tech` field has a specific GPUvPartitionTechnology subtype.
     """
 
     tech: GPUvPartitionTechnology
 
-    # def into_generic(self) -> GPUvPartitionType:
-    #     return GPUvPartitionType(self.name, self.id, self.tech, self.memory)
-
 
 class GPUvPartition(GPUPartition):
     """
-    Repesents a generic (mdev) GPU partition.
+    Repesents a generic VM (mdev) GPU partition.
 
     MDEVs are used since it seems to be the standard interface used by vendors to
     partition GPUs.
@@ -162,10 +173,9 @@ class GPUvPartition(GPUPartition):
 @dataclass
 class GPUhPartitionType(GPUPartitionType):
     """
-    A GPU host partition type.
+    GPUPartitionType specific for VM partitions.
 
-    A partition type has a specific amount of FB memory dedicated and is provided by the
-    GPU using a specific technology.
+    The `tech` field has a specific GPUhPartitionTechnology subtype.
     """
 
     tech: GPUhPartitionTechnology

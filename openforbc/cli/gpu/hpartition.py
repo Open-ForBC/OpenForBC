@@ -27,7 +27,7 @@ def list_supported_types(
     id_only: bool = Option(False, "--id-only", "-q"),
     technology: Optional[GPUhPartitionTechnology] = Option(None, "--tech", "-t"),
 ) -> None:
-    """List supported VM partition types."""
+    """List supported host partition types."""
 
     gpu_uuid = get_gpu_uuid()
 
@@ -63,5 +63,5 @@ def create_partition(
 
 @hpartition.command("destroy")
 def destroy_partition(partition_uuid: UUID) -> None:
-    """Destroy the selected host partition."""
+    """Destroy the specified host partition."""
     return global_state["api_client"].destroy_hpartition(get_gpu_uuid(), partition_uuid)
