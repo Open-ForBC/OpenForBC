@@ -45,7 +45,11 @@ from pynvml import (
 )
 
 from openforbc.error import PermissionException
-from openforbc.gpu.generic import GPU, GPUhPartition, GPUhPartitionType
+from openforbc.gpu.generic import (
+    GPU,
+    GPUPartitionType,
+    GPUPartitionUse,
+)
 from openforbc.gpu.nvidia.nvml import NVMLGpuInstance, nvml_context
 from openforbc.gpu.nvidia.vgpu import (
     VGPUCreateException,
@@ -66,7 +70,7 @@ from openforbc.sysfs.gpu import GPUSysFsHandle
 if TYPE_CHECKING:
     from typing import ClassVar, Sequence
 
-    from openforbc.gpu.generic import GPUvPartition, GPUvPartitionType
+    from openforbc.gpu.generic import GPUvPartition
     from openforbc.gpu.nvidia.nvml import NVMLDevice
 
 logger = getLogger(__name__)
@@ -164,39 +168,50 @@ class NvidiaGPU(GPU):
         """Pretty repr NvidiaGPU."""
         return f"{self.name} @{self.get_pci_bus_id()}"
 
-    def get_supported_vpart_types(self) -> Sequence[GPUvPartitionType]:
+    def get_partition_types(self, use: GPUPartitionUse, creatable: bool = False):
         """Get GPU supported partition types."""
-        return self.supported_vgpu_types
+        if use == GPUPartitionUse.VM_PARTITION:
+            return (
+                self.get_creatable_vgpus() if creatable else self.supported_vgpu_types
+            )
+        if use == GPUPartitionUse.HOST_PARTITION:
+            return (
+                [
+                    profile
+                    for profile in self.get_supported_gpu_instance_profiles()
+                    if self.get_gpu_instance_remaining_capacity(profile)
+                ]
+                if creatable
+                else self.get_supported_gpu_instance_profiles()
+            )
 
-    def get_creatable_vpart_types(self) -> Sequence[GPUvPartitionType]:
-        """Get GPU creatable partition types."""
-        return self.get_creatable_vgpus()
+        return []
 
-    def create_vpartition(self, type: GPUvPartitionType) -> GPUvPartition:
-        """Create a partition with specified type on this GPU."""
-        assert isinstance(type, VGPUType)
-        return self.create_vgpu(type)
+    def get_partitions(self, use: GPUPartitionUse):
+        """Get all created partitons on this GPU."""
+        return (
+            self.get_created_mdevs()
+            if use == GPUPartitionUse.VM_PARTITION
+            else self.get_mig_devices()
+            if use == GPUPartitionUse.HOST_PARTITION
+            else []
+        )
 
     def get_vpartitions(self) -> Sequence[GPUvPartition]:
         """Get created partitions on this GPU."""
         return self.get_created_mdevs()
 
-    def get_supported_hpart_types(self) -> Sequence[GPUhPartitionType]:
-        return self.get_supported_gpu_instance_profiles()
+    def create_partition(self, use: GPUPartitionUse, type: GPUPartitionType):
+        """Create a partition on this GPU with the specified type."""
+        if use == GPUPartitionUse.VM_PARTITION:
+            assert isinstance(type, VGPUType)
+            return self.create_vgpu(type)
 
-    def get_creatable_hpart_types(self) -> Sequence[GPUhPartitionType]:
-        return [
-            profile
-            for profile in self.get_supported_gpu_instance_profiles()
-            if self.get_gpu_instance_remaining_capacity(profile)
-        ]
+        if use == GPUPartitionUse.HOST_PARTITION:
+            gi = self.create_gpu_instance(type.id)
+            return next(x for x in self.get_mig_devices() if x.ci.parent.id == gi.id)
 
-    def get_hpartitions(self) -> Sequence[GPUhPartition]:
-        return self.get_mig_devices()
-
-    def create_hpartition(self, type: GPUhPartitionType) -> GPUhPartition:
-        gi = self.create_gpu_instance(type.id)
-        return next(x for x in self.get_mig_devices() if x.ci.parent.id == gi.id)
+        assert False  # Not supported use
 
     def create_gpu_instance(
         self, profile_id: int, default_ci: bool = True

@@ -3,16 +3,22 @@
 """Generic GPU partition management."""
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Literal, Union, overload
 
 
 if TYPE_CHECKING:
     from typing import Sequence
     from uuid import UUID
     from openforbc.pci import PCIID
+
+
+class GPUPartitionUse(Enum):
+    VM_PARTITION = 1
+    HOST_PARTITION = 2
 
 
 @dataclass
@@ -40,44 +46,70 @@ class GPU(_GPU, ABC):
 
         return NvidiaGPU.from_uuid(uuid)
 
+    @overload
     @abstractmethod
-    def get_supported_vpart_types(self) -> Sequence[GPUvPartitionType]:
-        """Get all the VM partition types supported by this GPU."""
+    def get_partition_types(
+        self, use: Literal[GPUPartitionUse.VM_PARTITION], creatable: bool = False
+    ) -> Sequence[GPUvPartitionType]:
+        ...
+
+    @overload
+    @abstractmethod
+    def get_partition_types(
+        self, use: Literal[GPUPartitionUse.HOST_PARTITION], creatable: bool = False
+    ) -> Sequence[GPUhPartitionType]:
         ...
 
     @abstractmethod
-    def get_creatable_vpart_types(self) -> Sequence[GPUvPartitionType]:
-        """Get all the VM partition types which can be actually created at this time."""
+    def get_partition_types(
+        self, use: GPUPartitionUse, creatable: bool = False
+    ) -> Sequence[GPUPartitionType]:
+        """
+        Get all the partition types supported by this GPU.
+
+        The `creatable` parameter allows specifying whether to get only types which are
+        currently available to be created.
+        """
+        ...
+
+    @overload
+    @abstractmethod
+    def get_partitions(
+        self, use: Literal[GPUPartitionUse.VM_PARTITION]
+    ) -> Sequence[GPUvPartition]:
+        ...
+
+    @overload
+    @abstractmethod
+    def get_partitions(
+        self, use: Literal[GPUPartitionUse.HOST_PARTITION]
+    ) -> Sequence[GPUhPartition]:
         ...
 
     @abstractmethod
-    def get_vpartitions(self) -> Sequence[GPUvPartition]:
-        """Get all created VM partitons on this GPU."""
+    def get_partitions(self, use: GPUPartitionUse) -> Sequence[GPUPartition]:
+        """Get all created partitons on this GPU."""
+        ...
+
+    @overload
+    @abstractmethod
+    def create_partition(
+        self, use: Literal[GPUPartitionUse.VM_PARTITION], type: GPUvPartitionType
+    ) -> GPUvPartition:
+        ...
+
+    @overload
+    @abstractmethod
+    def create_partition(
+        self, use: Literal[GPUPartitionUse.HOST_PARTITION], type: GPUhPartitionType
+    ) -> GPUhPartition:
         ...
 
     @abstractmethod
-    def create_vpartition(self, type: GPUvPartitionType) -> GPUvPartition:
-        """Create a VM partition on this GPU with the specified type."""
-        ...
-
-    @abstractmethod
-    def get_supported_hpart_types(self) -> Sequence[GPUhPartitionType]:
-        """Get all the host partition types supported by this GPU."""
-        ...
-
-    @abstractmethod
-    def get_creatable_hpart_types(self) -> Sequence[GPUhPartitionType]:
-        """Get all the host partition types which are available to create."""
-        ...
-
-    @abstractmethod
-    def get_hpartitions(self) -> Sequence[GPUhPartition]:
-        """Get all created host partitons on this GPU."""
-        ...
-
-    @abstractmethod
-    def create_hpartition(self, type: GPUhPartitionType) -> GPUhPartition:
-        """Create a host partition on this GPU with the specified type."""
+    def create_partition(
+        self, use: GPUPartitionUse, type: GPUPartitionType
+    ) -> GPUPartition:
+        """Create a partition on this GPU with the specified type."""
         ...
 
 
