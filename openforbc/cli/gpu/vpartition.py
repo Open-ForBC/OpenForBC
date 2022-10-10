@@ -60,7 +60,7 @@ def create_partition(
     echo(partition.uuid if uuid_only else partition)
 
 
-@vpartition.command("get")
+@vpartition.command("dumpxml")
 def get_partition_definition(partition_uuid: UUID):
     """Get libvirt XML definition for selected VM partition."""
     partitions = global_state["api_client"].get_vpartitions(get_gpu_uuid())
@@ -69,17 +69,13 @@ def get_partition_definition(partition_uuid: UUID):
         echo(f'ERROR: no such partition "{partition_uuid}".', err=True)
         raise Exit(1)
 
-    echo("NOTE: please ensure that PCI domain:bus:slot.function is not already used.")
     echo(
-        f"""
-<hostdev mode='subsystem' type='mdev' managed='no' model='vfio-pci' display='on'>
-  <source>
-    <address uuid='{partition_uuid}'/>
-  </source>
-  <address type='pci' domain='0x0000' bus='0x00' slot='0x10' function='0x0'/>
-</hostdev>
-        """,
-        nl=False,
+        f"""<hostdev mode='subsystem' type='mdev' managed='no' model='vfio-pci'
+              display='on'>
+              <source>
+                <address uuid='{partition_uuid}'/>
+              </source>
+            </hostdev>""",
     )
 
 
