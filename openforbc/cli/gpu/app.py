@@ -23,7 +23,7 @@ logger = getLogger(__name__)
 app = Typer(help="Operate on GPUs")
 app.add_typer(mig, name="mig")
 app.add_typer(hpartition, name="host-partition")
-app.add_typer(hpartition, name="hpart", help="Shortcut for *host-partition")
+app.add_typer(hpartition, name="hpart", help="Shortcut for *host-partition*")
 app.add_typer(vpartition, name="vm-partition")
 app.add_typer(vpartition, name="vpart", help="Shortcut for *vm-partition*")
 

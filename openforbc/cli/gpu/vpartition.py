@@ -70,12 +70,12 @@ def get_partition_definition(partition_uuid: UUID):
         raise Exit(1)
 
     echo(
-        f"""<hostdev mode='subsystem' type='mdev' managed='no' model='vfio-pci'
-              display='on'>
-              <source>
-                <address uuid='{partition_uuid}'/>
-              </source>
-            </hostdev>""",
+        "<hostdev mode='subsystem' type='mdev' managed='no' model='vfio-pci'"
+        " display='on'>\n"
+        "  <source>\n"
+        f"    <address uuid='{partition_uuid}'/>\n"
+        "  </source>\n"
+        "</hostdev>",
     )
 
 
