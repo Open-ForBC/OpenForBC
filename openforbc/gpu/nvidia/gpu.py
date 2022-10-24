@@ -172,15 +172,25 @@ class NvidiaGPU(GPU):
         """Get GPU supported partition types."""
         if use == GPUPartitionUse.VM_PARTITION:
             return (
-                self.get_creatable_vgpus() if creatable else self.supported_vgpu_types
+                (
+                    []
+                    if self.get_partitions(GPUPartitionUse.HOST_PARTITION)
+                    else self.get_creatable_vgpus()
+                )
+                if creatable
+                else self.supported_vgpu_types
             )
         if use == GPUPartitionUse.HOST_PARTITION:
             return (
-                [
-                    profile
-                    for profile in self.get_supported_gpu_instance_profiles()
-                    if self.get_gpu_instance_remaining_capacity(profile)
-                ]
+                (
+                    []
+                    if self.get_partitions(GPUPartitionUse.VM_PARTITION)
+                    else [
+                        profile
+                        for profile in self.get_supported_gpu_instance_profiles()
+                        if self.get_gpu_instance_remaining_capacity(profile)
+                    ]
+                )
                 if creatable
                 else self.get_supported_gpu_instance_profiles()
             )
