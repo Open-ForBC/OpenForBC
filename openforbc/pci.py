@@ -1,7 +1,8 @@
 # Copyright (c) 2021-2022 Istituto Nazionale di Fisica Nucleare
 # SPDX-License-Identifier: MIT
-
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 VENDORS = {0x10DE: "nvidia"}
 VENDORS_REV = {v: k for k, v in VENDORS.items()}
@@ -13,24 +14,21 @@ class PCIIDFormatException(Exception):
     pass
 
 
+@dataclass
 class PCIID:
     vendor: int
     device: int
-
-    def __init__(self, vendor: int, device: int) -> None:
-        self.vendor = vendor
-        self.device = device
 
     @classmethod
     def from_int(cls, pci_id: int) -> PCIID:
         return cls(pci_id & 0xFFFF, pci_id >> 16)
 
     @classmethod
-    def from_repr(cls, repr: str) -> PCIID:
-        if ":" not in repr:
+    def parse_str(cls, s: str) -> PCIID:
+        if ":" not in s:
             raise PCIIDFormatException
 
-        vendor_s, device_s = repr.split(":")
+        vendor_s, device_s = s.split(":")
         vendor = VENDORS_REV[vendor_s] if vendor_s in VENDORS_REV else int(vendor_s, 16)
         device = (
             DEVICES_REV[vendor][device_s]
@@ -39,7 +37,7 @@ class PCIID:
         )
         return cls(vendor, device)
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         vendor = VENDORS[self.vendor] if self.vendor in VENDORS else f"{self.vendor:x}"
         device = (
             DEVICES[self.vendor][self.device]
