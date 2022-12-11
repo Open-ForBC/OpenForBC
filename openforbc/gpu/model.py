@@ -11,6 +11,8 @@ from openforbc.gpu.generic import (
     GPUhPartitionType,
     GPUvPartitionType,
 )
+from openforbc.gpu.nvidia.mig import ComputeInstanceProfile
+from openforbc.gpu.nvidia.vgpu import VGPUType
 from openforbc.pci import PCIID
 
 
@@ -44,5 +46,15 @@ class GPUvPartitionModel(GPUPartitionModel):
 
 
 @dataclass
+class VGpuModel(GPUvPartitionModel):
+    type: VGPUType
+
+
+@dataclass
 class GPUhPartitionModel(GPUPartitionModel):
     type: GPUhPartitionType
+
+
+@dataclass
+class MIGDeviceModel(GPUhPartitionModel):
+    type: ComputeInstanceProfile
