@@ -319,9 +319,10 @@ class ComputeInstance:
 
 @dataclass
 class MIGDevice(GPUhPartition):
-    _nvml_dev: NVMLDevice
     gpu: NvidiaGPU
     ci: ComputeInstance
+
+    _nvml_dev: NVMLDevice
 
     @classmethod
     def from_handle(cls, dev: NVMLDevice, parent: NvidiaGPU) -> MIGDevice:
@@ -344,10 +345,10 @@ class MIGDevice(GPUhPartition):
 
         return cls(
             UUID(uuid),
-            ci.profile if len(gi.get_compute_instances()) > 1 else gi.profile,
-            dev,
+            ci.profile,
             parent,
             ci,
+            dev,
         )
 
     def destroy(self) -> None:

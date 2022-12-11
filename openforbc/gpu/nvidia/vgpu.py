@@ -66,26 +66,6 @@ class VGPUType(GPUvPartitionType):
     is_mig: bool
     gip_id: int
 
-    def __init__(
-        self, id: int, name: str, memory: int, vgpu_class: str, gip_id: int
-    ) -> None:
-        """Create a VGPUType instance."""
-        is_mig = gip_id != INVALID_GPU_INSTANCE_PROFILE_ID
-        super().__init__(
-            name,
-            id,
-            GPUvPartitionTechnology.NVIDIA_VGPU_MIG
-            if is_mig
-            else GPUvPartitionTechnology.NVIDIA_VGPU_TIMESHARED,
-            int(memory / 2**20),
-        )
-
-        self.id = id
-        self.name = name
-        self.vgpu_class = vgpu_class
-        self.is_mig = is_mig
-        self.gip_id = gip_id
-
     def __repr__(self) -> str:
         """Pretty repr VGPUType."""
         return f"{self.id}: {self.name}{' (MIG)' if self.is_mig else ''}"
@@ -94,12 +74,20 @@ class VGPUType(GPUvPartitionType):
     def from_id(cls, id: int) -> VGPUType:
         """Create VGPUType instance from the type ID."""
         with nvml_context():
+            gip_id = nvmlVgpuTypeGetGpuInstanceProfileId(id)
+            is_mig = gip_id != INVALID_GPU_INSTANCE_PROFILE_ID
+            memory = nvmlVgpuTypeGetFramebufferSize(id)
+
             return cls(
-                id,
                 nvmlVgpuTypeGetName(id),
-                nvmlVgpuTypeGetFramebufferSize(id),
+                id,
+                GPUvPartitionTechnology.NVIDIA_VGPU_MIG
+                if is_mig
+                else GPUvPartitionTechnology.NVIDIA_VGPU_TIMESHARED,
+                int(memory / 2**20),
                 nvmlVgpuTypeGetClass(id),
-                nvmlVgpuTypeGetGpuInstanceProfileId(id),
+                is_mig,
+                gip_id,
             )
 
     def get_mdev_type(self) -> str:
