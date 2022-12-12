@@ -172,14 +172,9 @@ class NvidiaGPU(GPU):
         """Get GPU supported partition types."""
         if use == GPUPartitionUse.VM_PARTITION:
             return (
-                (
-                    []
-                    if self.get_partitions(GPUPartitionUse.HOST_PARTITION)
-                    else self.get_creatable_vgpus()
-                )
-                if creatable
-                else self.supported_vgpu_types
+                self.get_creatable_vgpus() if creatable else self.supported_vgpu_types
             )
+
         if use == GPUPartitionUse.HOST_PARTITION:
             return (
                 (
@@ -353,9 +348,14 @@ class NvidiaGPU(GPU):
     def get_creatable_vgpus(self) -> list[VGPUType]:
         """Get creatable vGPU types for this GPU."""
         logger.info("geting creatable vGPUs for %s", self)
-        if not self.get_created_mdevs():
-            logger.debug("no mdevs, all types can be created")
-            return self.supported_vgpu_types
+        mdevs_present = bool(self.get_created_mdevs())
+        mig_devs_present = (
+            self.get_current_mig_status() == MIGModeStatus.ENABLE
+            and bool(self.get_mig_devices())
+        )
+
+        if not mdevs_present:
+            return [] if mig_devs_present else self.supported_vgpu_types
 
         supported_mig_vgpu_types = [
             type for type in self.supported_vgpu_types if type.is_mig
