@@ -3,21 +3,28 @@
 from __future__ import annotations
 
 from logging import getLogger
-from typing import List, TYPE_CHECKING, overload
+from typing import List, TYPE_CHECKING, Sequence, overload
 
-from pydantic import parse_raw_as
+from pydantic import parse_obj_as, parse_raw_as, ValidationError
 from requests import JSONDecodeError, Session
 from typer import Exit
 
 from openforbc.api.url import DEFAULT_BASE_URL, GPU_ENDPOINT_PATH
-from openforbc.gpu.generic import GPUPartitionType
-from openforbc.gpu.model import GPUModel, GPUPartitionModel
+from openforbc.gpu.generic import GPUhPartitionType, GPUvPartition, GPUvPartitionType
+from openforbc.gpu.model import (
+    GPUModel,
+    GPUhPartitionModel,
+    GPUvPartitionModel,
+    MIGDeviceModel,
+    VGpuModel,
+)
 from openforbc.gpu.nvidia.mig import (
     ComputeInstanceProfile,
     GPUInstanceProfile,
     MIGModeStatus,
 )
 from openforbc.gpu.nvidia.model import ComputeInstanceModel, GPUInstanceModel
+from openforbc.gpu.nvidia.vgpu import VGPUMdev
 
 if TYPE_CHECKING:
     from typing import Any, Literal, Optional, Type, TypeVar, Union
@@ -76,30 +83,97 @@ class APIClient:
             List[GPUModel], self.send_request("GET", f"{self.base_url}/gpu").text
         )
 
-    def get_supported_types(
+    def get_supported_vpart_types(
         self, gpu_uuid: UUID, creatable: bool = False
-    ) -> list[GPUPartitionType]:
+    ) -> list[GPUvPartitionType]:
         return self.send_gpu_request(
             gpu_uuid,
             "GET",
-            "/types",
+            "/vpart/types",
             {"creatable": int(creatable)},
-            type=List[GPUPartitionType],
+            type=List[GPUvPartitionType],
         )
 
-    def get_partitions(self, gpu_uuid: UUID) -> list[GPUPartitionModel]:
+    def get_vpartitions(self, gpu_uuid: UUID) -> Sequence[GPUvPartitionModel]:
+        json = self.send_gpu_request(gpu_uuid, "GET", "/vpart", json=True)
+        assert isinstance(json, list)
+
+        parts: list[VGpuModel] = []
+        for part in json:
+            TYPES = [GPUvPartitionModel, VGpuModel]
+            while TYPES:
+                try:
+                    part = parse_obj_as(TYPES.pop(), part)
+                    break
+                except ValidationError as e:
+                    if not TYPES:
+                        raise e from None
+
+                    continue
+
+            parts.append(part)
+        return parts
+
+    def create_vpartition(self, gpu_uuid: UUID, type_id: int) -> Any:
         return self.send_gpu_request(
-            gpu_uuid, "GET", "/partition", type=List[GPUPartitionModel]
+            gpu_uuid,
+            "POST",
+            "/vpart",
+            {"type_id": type_id},
+            type=GPUvPartitionModel,
         )
 
-    def create_partition(self, gpu_uuid: UUID, type_id: int) -> Any:
-        return self.send_gpu_request(
-            gpu_uuid, "POST", "/partition", {"type_id": type_id}, type=GPUPartitionModel
-        )
-
-    def destroy_partition(self, gpu_uuid: UUID, partition_uuid: UUID) -> None:
+    def destroy_vpartition(self, gpu_uuid: UUID, partition_uuid: UUID) -> None:
         json = self.send_gpu_request(
-            gpu_uuid, "DELETE", f"/partition/{partition_uuid}", json=True
+            gpu_uuid, "DELETE", f"/vpart/{partition_uuid}", json=True
+        )
+        assert "ok" in json
+        assert json["ok"]
+
+    def get_supported_hpart_types(
+        self, gpu_uuid: UUID, creatable: bool = False
+    ) -> list[GPUhPartitionType]:
+        return self.send_gpu_request(
+            gpu_uuid,
+            "GET",
+            "/hpart/types",
+            {"creatable": int(creatable)},
+            type=List[GPUhPartitionType],
+        )
+
+    def get_hpartitions(self, gpu_uuid: UUID) -> Sequence[GPUhPartitionModel]:
+        json = self.send_gpu_request(gpu_uuid, "GET", "/hpart", json=True)
+        assert isinstance(json, list)
+
+        parts: list[GPUhPartitionModel] = []
+        for part in json:
+            TYPES = [GPUhPartitionModel, MIGDeviceModel]
+            while TYPES:
+                try:
+                    type = TYPES.pop()
+                    part = parse_obj_as(type, part)
+                    break
+                except ValidationError as e:
+                    if not TYPES:
+                        raise e from None
+
+                    continue
+
+            parts.append(part)
+        return parts
+
+    def create_hpartition(self, gpu_uuid: UUID, type_id: int) -> Any:
+        return self.send_gpu_request(
+            gpu_uuid,
+            "POST",
+            "/hpart",
+            {"type_id": type_id},
+            type=GPUhPartitionModel,
+        )
+
+    def destroy_hpartition(self, gpu_uuid: UUID, partition_uuid: UUID) -> None:
+        json = self.send_gpu_request(
+            gpu_uuid, "DELETE", f"/hpart/{partition_uuid}", json=True
         )
         assert "ok" in json
         assert json["ok"]
@@ -279,6 +353,7 @@ class APIClient:
         if json:
             return r.json()
         if type is not None:
+            logger.debug("parsing as %s", type)
             return parse_raw_as(type, r.text)
 
         return r

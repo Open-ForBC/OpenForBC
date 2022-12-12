@@ -3,16 +3,22 @@
 """Generic GPU partition management."""
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, Union, overload
 
 
 if TYPE_CHECKING:
     from typing import Sequence
     from uuid import UUID
     from openforbc.pci import PCIID
+
+
+class GPUPartitionUse(Enum):
+    VM_PARTITION = 1
+    HOST_PARTITION = 2
 
 
 @dataclass
@@ -23,7 +29,7 @@ class _GPU:
 
 
 class GPU(_GPU, ABC):
-    """Generic GPU."""
+    """A generic GPU."""
 
     @classmethod
     def get_gpus(cls) -> Sequence[GPU]:
@@ -40,30 +46,76 @@ class GPU(_GPU, ABC):
 
         return NvidiaGPU.from_uuid(uuid)
 
+    @overload
     @abstractmethod
-    def get_supported_types(self) -> Sequence[GPUPartitionType]:
-        """Get all the partition types supported by this GPU."""
+    def get_partition_types(
+        self, use: Literal[GPUPartitionUse.VM_PARTITION], creatable: bool = False
+    ) -> Sequence[GPUvPartitionType]:
+        ...
+
+    @overload
+    @abstractmethod
+    def get_partition_types(
+        self, use: Literal[GPUPartitionUse.HOST_PARTITION], creatable: bool = False
+    ) -> Sequence[GPUhPartitionType]:
         ...
 
     @abstractmethod
-    def get_creatable_types(self) -> Sequence[GPUPartitionType]:
-        """Get all the partition types which can be actually created at this time."""
+    def get_partition_types(
+        self, use: GPUPartitionUse, creatable: bool = False
+    ) -> Sequence[GPUPartitionType]:
+        """
+        Get all the partition types supported by this GPU.
+
+        The `creatable` parameter allows specifying whether to get only types which are
+        currently available to be created.
+        """
+        ...
+
+    @overload
+    @abstractmethod
+    def get_partitions(
+        self, use: Literal[GPUPartitionUse.VM_PARTITION]
+    ) -> Sequence[GPUvPartition]:
+        ...
+
+    @overload
+    @abstractmethod
+    def get_partitions(
+        self, use: Literal[GPUPartitionUse.HOST_PARTITION]
+    ) -> Sequence[GPUhPartition]:
         ...
 
     @abstractmethod
-    def get_partitions(self) -> Sequence[GPUPartition]:
+    def get_partitions(self, use: GPUPartitionUse) -> Sequence[GPUPartition]:
         """Get all created partitons on this GPU."""
         ...
 
+    @overload
     @abstractmethod
-    def create_partition(self, type: GPUPartitionType) -> GPUPartition:
+    def create_partition(
+        self, use: Literal[GPUPartitionUse.VM_PARTITION], type: GPUvPartitionType
+    ) -> GPUvPartition:
+        ...
+
+    @overload
+    @abstractmethod
+    def create_partition(
+        self, use: Literal[GPUPartitionUse.HOST_PARTITION], type: GPUhPartitionType
+    ) -> GPUhPartition:
+        ...
+
+    @abstractmethod
+    def create_partition(
+        self, use: GPUPartitionUse, type: GPUPartitionType
+    ) -> GPUPartition:
         """Create a partition on this GPU with the specified type."""
         ...
 
 
-class GPUPartitionTechnology(str, Enum):
+class GPUvPartitionTechnology(str, Enum):
     """
-    A GPU partitioning technology.
+    A GPU partitioning technology for VMs.
 
     Different GPU vendors have their technologies.
 
@@ -74,6 +126,20 @@ class GPUPartitionTechnology(str, Enum):
 
     NVIDIA_VGPU_MIG = "vgpu+mig"
     NVIDIA_VGPU_TIMESHARED = "vgpu"
+
+
+class GPUhPartitionTechnology(str, Enum):
+    """
+    A GPU partitioning technology for host partitions.
+
+    Different GPU vendors have their own technology, but as of now the only supported
+    technology is NVIDIA Multi-Instance GPU (MIG).
+    """
+
+    NVIDIA_MIG = "mig"
+
+
+GPUPartitionTechnology = Union[GPUvPartitionTechnology, GPUhPartitionTechnology]
 
 
 @dataclass
@@ -91,27 +157,63 @@ class GPUPartitionType:
     memory: int
 
     def __str__(self) -> str:
-        return f"{self.id}: ({self.tech}) {self.name} ({self.memory / 2**30}GiB)"
-
-    def into_generic(self) -> GPUPartitionType:
-        return GPUPartitionType(self.name, self.id, self.tech, self.memory)
+        return f"{self.id}: ({self.tech}) {self.name} ({self.memory}MiB)"
 
 
 @dataclass
 class _GPUPartition:
     uuid: UUID
-    """UUID of the partition's mdev."""
     type: GPUPartitionType
 
 
 class GPUPartition(_GPUPartition, ABC):
     """
-    Repesent a generic (mdev) GPU partition.
+    A generic GPU partition.
 
-    MDEVs are used since it seems to be the standard interface used by vendors to
-    partition GPUs.
+    There can be two (sub)types of partitions:
+    - GPUvPartition: GPU partitions to be used in VMs
+    - GPUhPartition: GPU partitions which can be used by the host itself
     """
 
     @abstractmethod
     def destroy(self) -> None:
         ...
+
+
+@dataclass
+class GPUvPartitionType(GPUPartitionType):
+    """
+    GPUPartitionType specific for VM partitions.
+
+    The `tech` field has a specific GPUvPartitionTechnology subtype.
+    """
+
+    tech: GPUvPartitionTechnology
+
+
+class GPUvPartition(GPUPartition):
+    """
+    Repesents a generic VM (mdev) GPU partition.
+
+    MDEVs are used since it seems to be the standard interface used by vendors to
+    partition GPUs.
+    """
+
+    type: GPUvPartitionType
+
+
+@dataclass
+class GPUhPartitionType(GPUPartitionType):
+    """
+    GPUPartitionType specific for VM partitions.
+
+    The `tech` field has a specific GPUhPartitionTechnology subtype.
+    """
+
+    tech: GPUhPartitionTechnology
+
+
+class GPUhPartition(GPUPartition):
+    """Represents a generic GPU host partition."""
+
+    type: GPUhPartitionType

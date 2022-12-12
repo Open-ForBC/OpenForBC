@@ -21,7 +21,11 @@ from pynvml import (
     NVML_HOST_VGPU_MODE_SRIOV,
 )
 
-from openforbc.gpu.generic import GPUPartition, GPUPartitionType, GPUPartitionTechnology
+from openforbc.gpu.generic import (
+    GPUvPartition,
+    GPUvPartitionType,
+    GPUvPartitionTechnology,
+)
 from openforbc.gpu.nvidia.mig import GPUInstanceProfile
 from openforbc.gpu.nvidia.nvml import nvml_context
 from openforbc.sysfs.mdev import MdevSysFsHandle
@@ -55,32 +59,12 @@ class VGPUTypeException(Exception):
 
 
 @dataclass
-class VGPUType(GPUPartitionType):
+class VGPUType(GPUvPartitionType):
     """A NVIDIA vGPU type."""
 
     vgpu_class: str
     is_mig: bool
     gip_id: int
-
-    def __init__(
-        self, id: int, name: str, memory: int, vgpu_class: str, gip_id: int
-    ) -> None:
-        """Create a VGPUType instance."""
-        is_mig = gip_id != INVALID_GPU_INSTANCE_PROFILE_ID
-        super().__init__(
-            name,
-            id,
-            GPUPartitionTechnology.NVIDIA_VGPU_MIG
-            if is_mig
-            else GPUPartitionTechnology.NVIDIA_VGPU_TIMESHARED,
-            memory,
-        )
-
-        self.id = id
-        self.name = name
-        self.vgpu_class = vgpu_class
-        self.is_mig = is_mig
-        self.gip_id = gip_id
 
     def __repr__(self) -> str:
         """Pretty repr VGPUType."""
@@ -90,12 +74,20 @@ class VGPUType(GPUPartitionType):
     def from_id(cls, id: int) -> VGPUType:
         """Create VGPUType instance from the type ID."""
         with nvml_context():
+            gip_id = nvmlVgpuTypeGetGpuInstanceProfileId(id)
+            is_mig = gip_id != INVALID_GPU_INSTANCE_PROFILE_ID
+            memory = nvmlVgpuTypeGetFramebufferSize(id)
+
             return cls(
-                id,
                 nvmlVgpuTypeGetName(id),
-                nvmlVgpuTypeGetFramebufferSize(id),
+                id,
+                GPUvPartitionTechnology.NVIDIA_VGPU_MIG
+                if is_mig
+                else GPUvPartitionTechnology.NVIDIA_VGPU_TIMESHARED,
+                int(memory / 2**20),
                 nvmlVgpuTypeGetClass(id),
-                nvmlVgpuTypeGetGpuInstanceProfileId(id),
+                is_mig,
+                gip_id,
             )
 
     def get_mdev_type(self) -> str:
@@ -135,7 +127,7 @@ class VGPUInstance:
 
 
 @dataclass
-class VGPUMdev(GPUPartition):
+class VGPUMdev(GPUvPartition):
     """
     A VGPUMdev represents a VFIO Mediated device with a vGPU type.
 

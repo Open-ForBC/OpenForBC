@@ -5,12 +5,13 @@ NVIDIA Multi-Instance GPU management.
 
 MIG allows to create physically separate partitions on a supported (Ampere or later) GPU.
 """
-
 from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import IntEnum
 from logging import getLogger
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from pynvml import (
     NVML_COMPUTE_INSTANCE_ENGINE_PROFILE_SHARED,
@@ -21,22 +22,33 @@ from pynvml import (
     NVMLError_NotSupported,  # type: ignore
     nvmlComputeInstanceDestroy,
     nvmlComputeInstanceGetInfo,
+    nvmlDeviceGetComputeInstanceId,
     nvmlDeviceGetDeviceHandleFromMigDeviceHandle,
+    nvmlDeviceGetGpuInstanceById,
+    nvmlDeviceGetGpuInstanceId,
     nvmlDeviceGetGpuInstanceProfileInfo,
+    nvmlDeviceGetUUID,
+    nvmlDeviceIsMigDeviceHandle,
     nvmlGpuInstanceDestroy,
     nvmlGpuInstanceGetInfo,
     nvmlGpuInstanceCreateComputeInstance,
+    nvmlGpuInstanceGetComputeInstanceById,
     nvmlGpuInstanceGetComputeInstanceProfileInfo,
     nvmlGpuInstanceGetComputeInstanceRemainingCapacity,
     nvmlGpuInstanceGetComputeInstances,
 )
 
+from openforbc.gpu.generic import (
+    GPUhPartition,
+    GPUhPartitionType,
+    GPUhPartitionTechnology,
+)
 from openforbc.gpu.nvidia.nvml import NVMLComputeInstance
 
 
 if TYPE_CHECKING:
     from openforbc.gpu.nvidia.gpu import NvidiaGPU
-    from openforbc.gpu.nvidia.nvml import NVMLGpuInstance
+    from openforbc.gpu.nvidia.nvml import NVMLDevice, NVMLGpuInstance
 
 
 logger = getLogger(__name__)
@@ -62,17 +74,15 @@ class MIGModeStatus(IntEnum):
 
 
 @dataclass
-class GPUInstanceProfile:
+class GPUInstanceProfile(GPUhPartitionType):
     """A MIG GPU instance profile."""
 
-    id: int
     slice_count: int
-    memory_size: int
     media_engine: bool
 
     def __str__(self) -> str:
         """Pretty repr for GIP."""
-        return f"{self.slice_count}g.{round(self.memory_size / 1000)}gb" + (
+        return f"{self.slice_count}g.{round(self.memory / 1000)}gb" + (
             "+me" if self.slice_count < 7 and self.media_engine else ""
         )
 
@@ -80,7 +90,15 @@ class GPUInstanceProfile:
     def from_idx(cls, idx: int, gpu: NvidiaGPU) -> GPUInstanceProfile:
         """Build a GPUInstanceProfile from its index (NVML_GPU_ISNTANCE_PROFILE_*)."""
         info = nvmlDeviceGetGpuInstanceProfileInfo(gpu._nvml_dev, idx)
-        return cls(info.id, info.sliceCount, info.memorySizeMB, bool(info.jpegCount))
+        # return cls(info.id, info.sliceCount, info.memorySizeMB, bool(info.jpegCount))
+        return cls(
+            info.name.decode(),
+            info.id,
+            GPUhPartitionTechnology.NVIDIA_MIG,
+            info.memorySizeMB,  # TODO: convert to bytes? (or convert vgpu to MB)
+            info.sliceCount,
+            bool(info.jpegCount),
+        )
 
     @classmethod
     def from_id(cls, id: int, gpu: NvidiaGPU) -> GPUInstanceProfile:
@@ -92,7 +110,12 @@ class GPUInstanceProfile:
                 continue
             if info.id == id:
                 return cls(
-                    info.id, info.sliceCount, info.memorySizeMB, bool(info.jpegCount)
+                    info.name.decode(),
+                    info.id,
+                    GPUhPartitionTechnology.NVIDIA_MIG,
+                    info.memorySizeMB,  # TODO: convert to bytes? (or convert vgpu to MB)
+                    info.sliceCount,
+                    bool(info.jpegCount),
                 )
 
         raise NvidiaMIGGIPNotFound
@@ -213,20 +236,11 @@ class GPUInstance:
 
 
 @dataclass
-class ComputeInstanceProfile:
+class ComputeInstanceProfile(GPUhPartitionType):
     """A MIG compute instance profile."""
 
-    id: int
     slice_count: int
     gpu_instance_profile: GPUInstanceProfile
-
-    def __str__(self) -> str:
-        """Pretty repr for ComputeInstanceProfile."""
-        return (
-            f"{self.slice_count}c."
-            if self.slice_count != self.gpu_instance_profile.slice_count
-            else ""
-        ) + str(self.gpu_instance_profile)
 
     @classmethod
     def from_idx(cls, idx: int, gpu_instance: GPUInstance) -> ComputeInstanceProfile:
@@ -234,7 +248,14 @@ class ComputeInstanceProfile:
         info = nvmlGpuInstanceGetComputeInstanceProfileInfo(
             gpu_instance._nvml_dev, idx, NVML_COMPUTE_INSTANCE_ENGINE_PROFILE_SHARED
         )
-        return cls(info.id, info.sliceCount, gpu_instance.profile)
+        return cls(
+            info.name.decode(),
+            info.id,
+            GPUhPartitionTechnology.NVIDIA_MIG,
+            gpu_instance.profile.memory,
+            info.sliceCount,
+            gpu_instance.profile,
+        )
 
     @classmethod
     def from_id(cls, id: int, gpu_instance: GPUInstance) -> ComputeInstanceProfile:
@@ -249,7 +270,14 @@ class ComputeInstanceProfile:
             except NVMLError_NotSupported:
                 continue
             if info.id == id:
-                return cls(info.id, info.sliceCount, gpu_instance.profile)
+                return cls(
+                    info.name.decode(),
+                    info.id,
+                    GPUhPartitionTechnology.NVIDIA_MIG,
+                    gpu_instance.profile.memory,
+                    info.sliceCount,
+                    gpu_instance.profile,
+                )
         raise NvidiaMIGCIPNotFound
 
 
@@ -287,3 +315,46 @@ class ComputeInstance:
         """Destroy this CI."""
         logger.info("destroying CI %s", self)
         nvmlComputeInstanceDestroy(self._nvml_dev)
+
+
+@dataclass
+class MIGDevice(GPUhPartition):
+    gpu: NvidiaGPU
+    ci: ComputeInstance
+
+    _nvml_dev: NVMLDevice
+
+    @classmethod
+    def from_handle(cls, dev: NVMLDevice, parent: NvidiaGPU) -> MIGDevice:
+        assert nvmlDeviceIsMigDeviceHandle(dev)
+
+        uuid = nvmlDeviceGetUUID(dev)
+        logger.info("getting mig device info for %s", uuid)
+        if uuid.startswith("MIG-"):
+            uuid = uuid[len("MIG-") :]
+
+        gi_id = nvmlDeviceGetGpuInstanceId(dev)
+        ci_id = nvmlDeviceGetComputeInstanceId(dev)
+
+        gi = GPUInstance.from_nvml_handle_parent(
+            nvmlDeviceGetGpuInstanceById(parent._nvml_dev, gi_id), parent
+        )
+        ci = ComputeInstance.from_nvml_handle_parent(
+            nvmlGpuInstanceGetComputeInstanceById(gi._nvml_dev, ci_id), gi
+        )
+
+        return cls(
+            UUID(uuid),
+            ci.profile,
+            parent,
+            ci,
+            dev,
+        )
+
+    def destroy(self) -> None:
+        logger.info("destroying mig device %s", self.uuid)
+
+        self.ci.destroy()
+        if not self.ci.parent.get_compute_instances():
+            logger.debug("mig device GI has no other CIs, destroying also GI")
+            self.ci.parent.destroy()

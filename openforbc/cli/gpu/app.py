@@ -10,9 +10,9 @@ from typer import Context, echo, Exit, Option, Typer  # noqa: TC002
 
 from openforbc.cli.state import state as global_state
 from openforbc.cli.gpu.mig import mig
-from openforbc.cli.gpu.partition import partition
-from openforbc.cli.gpu.state import get_gpu_uuid, state
-from openforbc.gpu.generic import GPUPartitionTechnology  # noqa: TC001
+from openforbc.cli.gpu.hpartition import hpartition
+from openforbc.cli.gpu.vpartition import vpartition
+from openforbc.cli.gpu.state import state
 
 if TYPE_CHECKING:
     from typing import Dict
@@ -22,7 +22,10 @@ logger = getLogger(__name__)
 
 app = Typer(help="Operate on GPUs")
 app.add_typer(mig, name="mig")
-app.add_typer(partition, name="partition")
+app.add_typer(hpartition, name="host-partition")
+app.add_typer(hpartition, name="hpart", help="Shortcut for *host-partition*")
+app.add_typer(vpartition, name="vm-partition")
+app.add_typer(vpartition, name="vpart", help="Shortcut for *vm-partition*")
 
 
 @app.callback(invoke_without_command=True)
@@ -77,22 +80,3 @@ def list_gpus() -> None:
             pciids_count[str(gpu.pciid)] + 1 if str(gpu.pciid) in pciids_count else 0
         )
         echo(f"[{gpu.pciid}-{pciids_count[str(gpu.pciid)]}] " f"{gpu.uuid}: {gpu.name}")
-
-
-@app.command("types")
-def list_supported_types(
-    creatable: bool = Option(False, "--creatable", "-c"),
-    id_only: bool = Option(False, "--id-only", "-q"),
-    technology: Optional[GPUPartitionTechnology] = Option(None, "--tech", "-t"),
-) -> None:
-    """List supported partition types."""
-
-    gpu_uuid = get_gpu_uuid()
-
-    client = global_state["api_client"]
-    types = client.get_supported_types(gpu_uuid, creatable)
-
-    for type in (
-        filter(lambda type: type.tech == technology, types) if technology else types
-    ):
-        echo(type.id if id_only else type)
