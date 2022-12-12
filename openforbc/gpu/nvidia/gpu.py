@@ -213,6 +213,9 @@ class NvidiaGPU(GPU):
             return self.create_vgpu(type)
 
         if use == GPUPartitionUse.HOST_PARTITION:
+            if self.get_current_mig_status() == MIGModeStatus.DISABLE:
+                self.set_mig_mode(MIGModeStatus.ENABLE)
+
             gi = self.create_gpu_instance(type.id)
             return next(x for x in self.get_mig_devices() if x.ci.parent.id == gi.id)
 
