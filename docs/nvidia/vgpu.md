@@ -54,7 +54,7 @@ Ampere or later architectures can also support Multi-Instance GPU ([MIG](./mig.m
 
 #### Time-sliced vGPUs
 
-Time-sliced vGPUs running on a GPU share access to all the GPU's engines, processes from vGPUs are scheduled by the GPU to run in series and the running vGPU has exclusive access to GPU's engines. The [scheduling behavior](#time-sliced-vgpu-scheduling-bahevior) of time-sliced vGPUs can be changed on GPUs based on architectures after Maxwell.
+Time-sliced vGPUs running on a GPU share access to all the GPU's engines, processes from vGPUs are scheduled by the GPU to run in series and the running vGPU has exclusive access to GPU's engines. The [scheduling behavior](https://docs.nvidia.com/grid/13.0/grid-vgpu-user-guide/index.html#changing-vgpu-scheduling-policy) of time-sliced vGPUs can be changed on GPUs based on architectures after Maxwell.
 
 #### MIG-backed vGPUs
 
